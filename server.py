@@ -87,7 +87,7 @@ a{text-decoration:none;color:inherit}
 .card-sub{font-size:13px;color:#888}
 .card-highlight{border-left:4px solid #ff8f00;background:#fff8e1}
 .card-reminder{background:#f5f0eb}
-.date-nav{display:flex;align-items:center;justify-content:space-between;padding:12px 0;margin-bottom:8px}
+.date-nav{display:flex;align-items:center;justify-content:space-between;padding:12px 0;margin-bottom:8px;position:sticky;top:56px;z-index:50;background:#f5f5f5}
 .date-arrow{font-size:28px;padding:8px 16px;color:#999;user-select:none}
 .date-center{text-align:center}
 .date-main{font-size:20px;font-weight:700;color:#333}
@@ -117,10 +117,11 @@ a{text-decoration:none;color:inherit}
 .feedback-ratings{display:flex;gap:20px;margin-bottom:12px;flex-wrap:wrap}
 .rating-group{flex:1;min-width:140px}
 .rating-group label{font-size:13px;color:#666;display:block;margin-bottom:4px}
-.stars{font-size:24px;cursor:pointer}
-.star{color:#ddd;transition:color .15s}
-.star.active,.star.active~.star{color:#ffc107}
+.stars{font-size:28px;cursor:pointer;display:flex;gap:4px}
+.star{color:#ddd;transition:color .15s;padding:2px}
+.star.active,.star.active~.star{color:#ff8f00}
 .star:hover,.star:hover~.star{color:#ffb300}
+.star-hint{font-size:11px;color:#aaa;margin-top:2px;display:block}
 .btn{padding:10px 24px;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s}
 .btn-primary{background:#5d4037;color:#fff;width:100%}
 .btn-primary:hover{background:#4e342e}
@@ -200,8 +201,8 @@ HTML_FOOT = '''</main>
 <p class="footer-small">专属定制 · 基于已验证命盘</p></footer>
 <script>
 function setRating(el){var c=el.parentElement,v=parseInt(el.dataset.value),n=c.dataset.name;var h=c.querySelector('input[type=hidden]');if(!h){h=document.createElement('input');h.type='hidden';h.name=n;c.appendChild(h)}h.value=v;var s=c.querySelectorAll('.star');s.forEach(function(x,i){x.textContent=i<v?'★':'☆';x.classList.toggle('active',i<v)})}
-function submitFeedback(e){e.preventDefault();var f=e.target,d={};new FormData(f).forEach(function(v,k){if(k==='actual_rating'||k==='accuracy_rating')d[k]=parseInt(v)||null;else d[k]=v});fetch('/api/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json()}).then(function(d){if(d.status==='ok'){alert('✅ 反馈已保存！');location.reload()}else alert('保存失败: '+d.error}).catch(function(){alert('网络错误')});return false}
-function submitDiary(e){e.preventDefault();var f=document.getElementById('diary-form'),d={};new FormData(f).forEach(function(v,k){if(k==='mood')d[k]=parseInt(v);else d[k]=v});fetch('/api/diary',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json()}).then(function(d){if(d.status==='ok'){alert('✅ 日记已保存！');location.reload()}else alert('保存失败: '+d.error}).catch(function(){alert('网络错误')});return false}
+function submitFeedback(e){e.preventDefault();var f=e.target,d={};new FormData(f).forEach(function(v,k){if(k==='actual_rating'||k==='accuracy_rating')d[k]=parseInt(v)||null;else d[k]=v});fetch('/api/feedback',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json()}).then(function(d){if(d.status==='ok'){alert('✅ 反馈已保存！');location.reload()}else alert('保存失败: '+d.error}).catch(function(){alert('网络错误')});return false}
+function submitDiary(e){e.preventDefault();var f=document.getElementById('diary-form'),d={};new FormData(f).forEach(function(v,k){if(k==='mood')d[k]=parseInt(v);else d[k]=v});fetch('/api/diary',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json()}).then(function(d){if(d.status==='ok'){alert('✅ 日记已保存！');location.reload()}else alert('保存失败: '+d.error}).catch(function(){alert('网络错误')});return false}
 function editFeedback(){document.getElementById('feedback-form').classList.remove('hidden')}
 function toggleVoiceInput(){var t=document.getElementById('diary-input');var s=document.getElementById('voice-status');if(!window.SpeechRecognition&&!window.webkitSpeechRecognition){alert('您的浏览器不支持语音输入。建议使用Chrome浏览器，或者用手机自带的语音键盘输入。');return}var r=window.SpeechRecognition||window.webkitSpeechRecognition;var rec=new r();rec.lang='zh-CN';rec.interimResults=true;var btn=document.getElementById('voice-btn');btn.textContent='⏹️';btn.style.borderColor='#c62828';s.style.display='block';rec.onresult=function(e){var res='';for(var i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)res+=e.results[i][0].transcript}t.value+=res};rec.onend=function(){btn.textContent='🎤';btn.style.borderColor='#e0e0e0';s.style.display='none'};rec.onerror=function(){btn.textContent='🎤';btn.style.borderColor='#e0e0e0';s.style.display='none';alert('语音识别出错，请重试或使用手机语音键盘输入')};rec.start()}
 function submitPlan(e){e.preventDefault();var f=document.getElementById('plan-form'),d={};new FormData(f).forEach(function(v,k){d[k]=v});fetch('/api/plans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json()}).then(function(d){if(d.status==='ok'){alert('✅ 已记录！');location.reload()}else alert('添加失败: '+d.error}).catch(function(){alert('网络错误')});return false}
@@ -545,7 +546,7 @@ class BaziHandler(BaseHTTPRequestHandler):
             content += f'<button onclick="editFeedback()" class="btn btn-sm">修改</button></div>'
         
         content += f'''
-        <form id="feedback-form" class="{"hidden" if fb else ""}" onsubmit="return submitFeedback(event)">
+        <form id="feedback-form" method="post" class="{"hidden" if fb else ""}" onsubmit="return submitFeedback(event)">
         <input type="hidden" name="date" value="{target_date.isoformat()}">
         <input type="hidden" name="prediction_score" value="{s["score"]}">
         <input type="hidden" name="prediction_level" value="{s["level"]}">
@@ -558,7 +559,7 @@ class BaziHandler(BaseHTTPRequestHandler):
         <span class="star" data-value="3" onclick="setRating(this)">☆</span>
         <span class="star" data-value="4" onclick="setRating(this)">☆</span>
         <span class="star" data-value="5" onclick="setRating(this)">☆</span>
-        </div></div>
+        </div><span class="star-hint">轻点星星评分</span></div>
         <div class="rating-group"><label>预测准确度</label>
         <div class="stars" data-name="accuracy_rating">
         <span class="star" data-value="1" onclick="setRating(this)">☆</span>
@@ -566,7 +567,7 @@ class BaziHandler(BaseHTTPRequestHandler):
         <span class="star" data-value="3" onclick="setRating(this)">☆</span>
         <span class="star" data-value="4" onclick="setRating(this)">☆</span>
         <span class="star" data-value="5" onclick="setRating(this)">☆</span>
-        </div></div></div>
+        </div><span class="star-hint">轻点星星评分</span></div></div>
         <button type="submit" class="btn btn-primary">提交反馈</button>
         </form></div>'''
         
@@ -858,6 +859,94 @@ class BaziHandler(BaseHTTPRequestHandler):
 # ============================================================
 #  启动
 # ============================================================
+
+# ============================================================
+#  WSGI 兼容层 (用于 PythonAnywhere 等云平台)
+# ============================================================
+
+def app(environ, start_response):
+    """WSGI application entry point"""
+    # 捕获 BaziHandler 的输出
+    from io import BytesIO
+    import sys
+    
+    path = environ.get('PATH_INFO', '/')
+    method = environ.get('REQUEST_METHOD', 'GET')
+    
+    # 创建模拟请求
+    class FakeSocket:
+        def __init__(self):
+            self.data = b''
+            self.headers = {}
+    
+    # 直接使用 do_GET/do_POST 逻辑
+    handler = BaziHandler(None, ('0.0.0.0', 0), None)
+    
+    # 重写发送方法
+    output = []
+    status_code = '200 OK'
+    response_headers = []
+    
+    def fake_send_response(code):
+        nonlocal status_code
+        status_code = f'{code} OK'
+    
+    def fake_send_header(key, value):
+        response_headers.append((key, value))
+    
+    def fake_end_headers():
+        pass
+    
+    def fake_send(data):
+        if isinstance(data, str):
+            output.append(data.encode('utf-8'))
+        else:
+            output.append(data)
+    
+    handler.send_response = fake_send_response
+    handler.send_header = fake_send_header
+    handler.end_headers = fake_end_headers
+    handler.wfile = FakeSocket()
+    
+    def fake_write(data):
+        if isinstance(data, str):
+            output.append(data.encode('utf-8'))
+        else:
+            output.append(data)
+    
+    handler.wfile.write = fake_write
+    
+    # 设置请求信息
+    handler.path = path
+    handler.headers = {}
+    handler.command = method
+    
+    # 从 environ 获取 headers
+    for key, value in environ.items():
+        if key.startswith('HTTP_'):
+            header_name = key[5:].replace('_', '-').title()
+            handler.headers[header_name] = value
+        elif key in ('CONTENT_TYPE', 'CONTENT_LENGTH'):
+            handler.headers[key.replace('_', '-').title()] = value
+    
+    # 处理请求
+    try:
+        if method == 'GET':
+            handler.do_GET()
+        elif method == 'POST':
+            # 读取 body
+            content_length = int(environ.get('CONTENT_LENGTH', 0))
+            body = environ['wsgi.input'].read(content_length) if content_length > 0 else b''
+            handler.rfile = BytesIO(body) if body else BytesIO(b'{}')
+            handler.do_POST()
+    except Exception as e:
+        output = [f'Error: {e}'.encode('utf-8')]
+    
+    # 返回 WSGI 响应
+    output_data = b''.join(output) if output else b'OK'
+    start_response(status_code, response_headers)
+    return [output_data]
+
 
 if __name__ == '__main__':
     init_db()
