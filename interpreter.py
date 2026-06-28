@@ -434,10 +434,35 @@ class PersonalizedInterpreter:
         }
     
     def _generate_reminders(self, daily_bazi, comparison, current_dayun, target_date) -> List[str]:
-        """生成专属提醒"""
+        """生成专属提醒 - 含特殊日子预警"""
         reminders = []
         
-        # 季节提醒
+        day_branch = daily_bazi["day"]["branch"]
+        birth_branch = self.birth_chart["day"]["branch"]  # 巳 = 5
+        
+        # ===== 特殊地支关系预警（基于你的日支巳） =====
+        
+        # 巳申合 (水局) - 合化泄身，容易累
+        if day_branch == 8:  # 申
+            reminders.append("🌊 【巳申合水日】今天你的日支巳与流日申相合化水。水泄金气，能量容易被合走，下午开始会明显感到累。建议：重要的事上午做，下午留时间给自己充电。")
+        
+        # 巳酉半合金局 - 禄神帮身，能量好日
+        if day_branch == 9:  # 酉
+            reminders.append("🔥 【巳酉半合金局日】禄神到位！今天你的日支巳与酉半合金局，身弱变强，能量充沛。适合推进重要事项，大胆表达自己。")
+        
+        # 巳午半会火局 - 加重忌神
+        if day_branch == 6:  # 午
+            reminders.append("🔥 【巳午半会火日】火势加重，注意心火和情绪波动。容易急躁或焦虑，做事前先深呼吸三次。")
+        
+        # 巳亥冲 - 冲击大
+        if day_branch == 11:  # 亥
+            reminders.append("⚡ 【巳亥冲日】今日与你的日支相冲，能量波动大。不宜做重大决定，注意身体健康（特别是心脑血管）。")
+        
+        # 巳寅相刑
+        if day_branch == 2:  # 寅
+            reminders.append("△ 【巳寅相刑日】注意人际关系中的小摩擦，言辞易伤人。能不说的就先不说。")
+        
+        # ===== 季节提醒 =====
         month = target_date.month
         if 3 <= month <= 5:
             reminders.append("🌱 春季木旺，你需要多用土金来平衡（穿米色/白色/金色，减少绿色/红色）")

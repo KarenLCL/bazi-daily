@@ -18,7 +18,7 @@ from bazi_engine import (
     get_bazi_pillar_name, get_five_element_from_stem,
     get_five_element_from_branch, get_ten_god,
     get_hour_branch_from_time, get_year_stem_branch,
-    get_month_stem_branch,
+    get_month_stem_branch, get_branch_relation,
 )
 from user_profile import PROFILE, BIRTH_CHART, get_current_dayun
 from interpreter import PersonalizedInterpreter
@@ -541,8 +541,34 @@ class BaziHandler(BaseHTTPRequestHandler):
         
         <div class="card"><div class="card-header"><span class="card-icon">📋</span><span class="card-title">今日总览</span></div>
         <p class="card-text">{o['summary']}</p>
-        <p class="card-text card-sub">{o.get('element_note','')}</p></div>
+        <p class="card-text card-sub">{o.get('element_note','')}</p></div>'''
         
+        # ---- 八字之神·昨日回顾 ----
+        yesterday = target_date - timedelta(days=1)
+        y_fb = get_feedback_by_date(yesterday.isoformat())
+        if y_fb and y_fb.get('actual_feedback'):
+            y_text = y_fb['actual_feedback'][:150]
+            y_score = y_fb.get('prediction_score', '')
+            y_acc = y_fb.get('accuracy_rating', 0) or 0
+            y_stars = '★'*y_acc + '☆'*(5-y_acc)
+            _, y_branch = get_day_stem_branch(yesterday)
+            db = r['daily_bazi']['day']['branch']
+            ny_rel = get_branch_relation(db, y_branch)
+            ny_s = '、'.join(ny_rel) if ny_rel else '平'
+            today_e = EARTHLY_BRANCHES[db]
+            yest_e = EARTHLY_BRANCHES[y_branch]
+            extra = ''
+            if db == 8:
+                extra = ' 今天又是巳申合日，再次提醒：能量容易外泄，重要的事上午做完，下午留时间独处充电。'
+            content += f'''
+            <div class="card" style="background:#f5f0eb">
+            <div class="card-header"><span class="card-icon">📖</span><span class="card-title">八字之神·昨日回顾</span></div>
+            <p class="card-text card-sub">昨日({yesterday.strftime("%m月%d日")})你说：</p>
+            <p class="card-text" style="background:#fff;padding:12px;border-radius:8px;margin:6px 0">"{y_text}"</p>
+            <p class="card-text card-sub">准确度: {y_stars} | 预测{y_score}分</p>
+            <p class="card-text" style="margin-top:8px">📌 <strong>今日与昨日的关系：</strong>昨日地支「{yest_e}」→ {ny_s} → 今日地支「{today_e}」{extra}</p></div>'''
+        
+        content += f'''
         <div class="card card-highlight"><div class="card-header"><span class="card-icon">🔄</span><span class="card-title">大运 · {reading['current_dayun']['name']}</span>
         <span class="card-badge">{reading['current_dayun']['age']}岁</span></div>
         <p class="card-text">{c['dayun_effect']}</p></div>
