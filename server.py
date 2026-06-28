@@ -190,6 +190,7 @@ a{text-decoration:none;color:inherit}
 <a href="/" class="nav-item NAV_HOME">今日</a>
 <a href="/monthly" class="nav-item NAV_MONTHLY">本月</a>
 <a href="/yearly" class="nav-item NAV_YEARLY">本年</a>
+<a href="/report" class="nav-item NAV_REPORT">报告</a>
 <a href="/diary" class="nav-item NAV_DIARY">日记</a>
 <a href="/history" class="nav-item NAV_HISTORY">记录</a>
 </div></div></div>
@@ -203,7 +204,7 @@ HTML_FOOT = '''</main>
 function setRating(el){var c=el.parentElement,v=parseInt(el.dataset.value),n=c.dataset.name;var h=c.querySelector('input[type=hidden]');if(!h){h=document.createElement('input');h.type='hidden';h.name=n;c.appendChild(h)}h.value=v;var s=c.querySelectorAll('.star');s.forEach(function(x,i){x.textContent=i<v?'★':'☆';x.classList.toggle('active',i<v)})}
 function submitFeedback(e){e.preventDefault();var f=e.target,d={};new FormData(f).forEach(function(v,k){if(k==='actual_rating'||k==='accuracy_rating')d[k]=parseInt(v)||null;else d[k]=v});fetch('/api/feedback',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json()}).then(function(d){if(d.status==='ok'){alert('✅ 反馈已保存！');location.reload()}else alert('保存失败: '+d.error}).catch(function(){alert('网络错误')});return false}
 function submitDiary(e){e.preventDefault();var f=document.getElementById('diary-form'),d={};new FormData(f).forEach(function(v,k){if(k==='mood')d[k]=parseInt(v);else d[k]=v});fetch('/api/diary',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json()}).then(function(d){if(d.status==='ok'){alert('✅ 日记已保存！');location.reload()}else alert('保存失败: '+d.error}).catch(function(){alert('网络错误')});return false}
-function editFeedback(){document.getElementById('feedback-form').classList.remove('hidden')}
+function editFeedback(){var f=document.getElementById('feedback-form');f.classList.remove('hidden');var fbText=f.querySelector('[name=actual_feedback]');if(fbText){var existing=document.querySelector('.feedback-exists');if(existing){var shortText=existing.querySelector('.card-sub');if(shortText){fbText.value=shortText.textContent.replace('你写的: ','')}}}}
 function toggleVoiceInput(){var t=document.getElementById('diary-input');var s=document.getElementById('voice-status');if(!window.SpeechRecognition&&!window.webkitSpeechRecognition){alert('您的浏览器不支持语音输入。建议使用Chrome浏览器，或者用手机自带的语音键盘输入。');return}var r=window.SpeechRecognition||window.webkitSpeechRecognition;var rec=new r();rec.lang='zh-CN';rec.interimResults=true;var btn=document.getElementById('voice-btn');btn.textContent='⏹️';btn.style.borderColor='#c62828';s.style.display='block';rec.onresult=function(e){var res='';for(var i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)res+=e.results[i][0].transcript}t.value+=res};rec.onend=function(){btn.textContent='🎤';btn.style.borderColor='#e0e0e0';s.style.display='none'};rec.onerror=function(){btn.textContent='🎤';btn.style.borderColor='#e0e0e0';s.style.display='none';alert('语音识别出错，请重试或使用手机语音键盘输入')};rec.start()}
 function submitPlan(e){e.preventDefault();var f=document.getElementById('plan-form'),d={};new FormData(f).forEach(function(v,k){d[k]=v});fetch('/api/plans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json()}).then(function(d){if(d.status==='ok'){alert('✅ 已记录！');location.reload()}else alert('添加失败: '+d.error}).catch(function(){alert('网络错误')});return false}
 function deletePlan(id){if(!confirm('确定删除这条记录？'))return;fetch('/api/plans/'+id,{method:'DELETE'}).then(function(r){return r.json()}).then(function(d){if(d.status==='ok'){location.reload()}else alert('删除失败')})}
@@ -295,6 +296,11 @@ class BaziHandler(BaseHTTPRequestHandler):
                 today = date.today()
                 y = int(params.get('year', [today.year])[0])
                 self._serve_yearly(y)
+            elif path == '/report':
+                today = date.today()
+                y = int(params.get('year', [today.year])[0])
+                m = int(params.get('month', [today.month])[0])
+                self._serve_report(y, m)
             elif path == '/diary':
                 self._serve_diary()
             elif path == '/history':
@@ -411,7 +417,7 @@ class BaziHandler(BaseHTTPRequestHandler):
         self.wfile.write(str(text).encode('utf-8'))
     
     def _page(self, content, active_nav=''):
-        nav_class = {'home':'','monthly':'','yearly':'','diary':'','history':''}
+        nav_class = {'home':'','monthly':'','yearly':'','report':'','diary':'','history':''}
         if active_nav in nav_class:
             nav_class[active_nav] = 'active'
         html = HTML_HEAD
@@ -820,8 +826,20 @@ class BaziHandler(BaseHTTPRequestHandler):
         if feedbacks:
             content += '<div class="feedback-list">'
             for fb in feedbacks:
-                lev_bg = {'大吉':'#c8e6c9','吉':'#dcedc8','平':'#fff9c4','不佳':'#ffe0b2','谨慎':'#ffcdd2'}.get(fb.get('prediction_level','平'), '#fff9c4')
-                content += f'<div class="feedback-item"><div class="fb-header"><a href="/date/{fb["date"]}" class="fb-date">{fb["date"]}</a><span class="fb-level" style="background:{lev_bg}">{fb.get("prediction_level","")}</span><span class="fb-score">{fb.get("prediction_score","")}分</span></div>'
+                # 获取当日干支和关系
+                try:
+                    d = date.fromisoformat(fb['date'])
+                    ds, db = get_day_stem_branch(d)
+                    pillar = get_bazi_pillar_name(ds, db)
+                    birth_db = BIRTH_CHART["day"]["branch"]
+                    relations = get_branch_relation(db, birth_db)
+                    rel_str = ' '.join(relations) if relations else '平'
+                except:
+                    pillar = '--'
+                    rel_str = '--'
+                
+                lev_bg = '#fff8e1' if fb.get('prediction_level') in ['大吉','吉'] else '#efebe9'
+                content += f'<div class="feedback-item" style="border-left:3px solid {"#bf8f00" if fb.get("accuracy_rating") and fb.get("accuracy_rating",0)>=3 else "#e0e0e0"}"><div class="fb-header"><a href="/date/{fb["date"]}" class="fb-date">{fb["date"]}</a><span class="tag">{pillar}</span><span class="tag" style="background:{lev_bg};font-size:11px">{rel_str}</span><span class="fb-score">{fb.get("prediction_score","")}分</span></div>'
                 if fb.get('actual_feedback'):
                     content += f'<p class="fb-content">{fb["actual_feedback"][:200]}{"…" if len(fb["actual_feedback"])>200 else ""}</p>'
                 content += '<div class="fb-ratings">'
@@ -854,8 +872,126 @@ class BaziHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format, *args):
         print(f"[{datetime.now().strftime('%H:%M:%S')}] {args[0]} {args[1]} {args[2]}")
-
-
+    
+    # ============================================================
+    #  月度报告 (生命之书)
+    # ============================================================
+    
+    def _serve_report(self, year, month):
+        """生成月度报告 - 结合反馈+日记+命理分析"""
+        from database import get_feedback_by_month, get_diary_entries
+        from bazi_engine import get_bazi_pillar_name, get_day_stem_branch, get_branch_relation, HEAVENLY_STEMS, EARTHLY_BRANCHES, get_five_element_from_stem, get_five_element_from_branch
+        
+        monthly_reading = interpreter.generate_monthly_reading(year, month)
+        feedbacks = get_feedback_by_month(year, month)
+        diaries = get_diary_entries(50)
+        
+        prev_y, prev_m = (year-1, 12) if month == 1 else (year, month-1)
+        next_y, next_m = (year+1, 1) if month == 12 else (year, month+1)
+        
+        # 统计
+        total_fb = len(feedbacks)
+        avg_accuracy = 0
+        avg_actual = 0
+        if total_fb > 0:
+            acc_vals = [f.get('accuracy_rating', 0) or 0 for f in feedbacks]
+            act_vals = [f.get('actual_rating', 0) or 0 for f in feedbacks]
+            avg_accuracy = round(sum(acc_vals) / total_fb, 1)
+            avg_actual = round(sum(act_vals) / total_fb, 1)
+        
+        level = monthly_reading['level']
+        lev_class = LEVEL_CLASSES.get(level, 'ping')
+        avg_score = monthly_reading['avg_score']
+        
+        content = f'''
+        <div class="date-nav">
+        <a href="/report?year={prev_y}&month={prev_m}" class="date-arrow">‹</a>
+        <div class="date-center"><h2 class="date-main">{year}年{month}月 · 生命之书</h2>
+        <span class="date-lunar">{monthly_reading['month_pillar']} · 反馈{total_fb}天</span></div>
+        <a href="/report?year={next_y}&month={next_m}" class="date-arrow">›</a>
+        </div>
+        
+        <div class="score-card" style="background:#f5f0eb">
+        <div class="score-circle" style="background:conic-gradient(#5d4037 {avg_score*3.6}deg,#f0f0f0 {avg_score*3.6}deg)">
+        <div class="score-number">{int(avg_score)}</div>
+        <div class="score-label">月运</div></div>
+        <div class="score-info">
+        <div class="score-level {lev_class}">{level}</div>
+        <div class="score-pillar">反馈{total_fb}天 · 准确率{avg_accuracy}/5 · 感受{avg_actual}/5</div>
+        </div></div>'''
+        
+        # ---- 命理总评 ----
+        if 'details' in monthly_reading:
+            det = monthly_reading['details']
+            content += f'''
+            <div class="card card-highlight"><div class="card-header"><span class="card-icon">📖</span><span class="card-title">八字之神·月度寄语</span></div>
+            <p class="card-text">{det["overview"]}</p></div>'''
+        
+        # ---- 每日反馈流水 ----
+        content += '<div class="card"><div class="card-header"><span class="card-icon">📋</span><span class="card-title">每日记录</span></div>'
+        
+        if feedbacks:
+            for fb in feedbacks:
+                fb_date = fb.get('date', '')
+                fb_score = fb.get('prediction_score', '')
+                fb_level = fb.get('prediction_level', '')
+                fb_text = fb.get('actual_feedback', '')
+                fb_accuracy = fb.get('accuracy_rating')
+                fb_actual = fb.get('actual_rating')
+                
+                # 当日干支和关系
+                try:
+                    d = date.fromisoformat(fb_date)
+                    ds, db = get_day_stem_branch(d)
+                    pillar = get_bazi_pillar_name(ds, db)
+                    birth_db = BIRTH_CHART["day"]["branch"]
+                    relations = get_branch_relation(db, birth_db)
+                    rel_str = ' '.join(relations) if relations else '平'
+                except:
+                    pillar = '--'
+                    rel_str = '--'
+                
+                lev_bg = '#fff8e1' if fb_level in ['大吉','吉'] else '#efebe9'
+                content += f'''
+                <div class="feedback-item" style="border-left:3px solid {"#bf8f00" if fb_accuracy and fb_accuracy>=3 else "#e0e0e0"};margin-bottom:8px">
+                <div class="fb-header">
+                <a href="/date/{fb_date}" class="fb-date">{fb_date}</a>
+                <span class="tag">{pillar}</span>
+                <span class="tag" style="background:{lev_bg}">{rel_str}</span>
+                <span class="fb-score">{fb_score}分</span>
+                </div>'''
+                if fb_text:
+                    content += f'<p class="fb-content">{fb_text}</p>'
+                content += '<div class="fb-ratings">'
+                if fb_accuracy:
+                    content += f'<span>准确: {"★"*fb_accuracy}{"☆"*(5-fb_accuracy)}</span>'
+                if fb_actual:
+                    content += f'<span>感受: {"★"*fb_actual}{"☆"*(5-fb_actual)}</span>'
+                content += '</div></div>'
+        else:
+            content += '<p class="card-text card-sub">本月还没有反馈记录。每天看完运势后记得反馈哦！</p>'
+        
+        content += '</div>'
+        
+        # ---- 日常建议 ----
+        if 'work_advice' in monthly_reading and monthly_reading['work_advice']:
+            content += '<div class="card card-reminder"><div class="card-header"><span class="card-icon">💡</span><span class="card-title">八字之神·工作建议</span></div>'
+            for a in monthly_reading['work_advice']:
+                content += f'<p class="card-text">{a}</p>'
+            content += '</div>'
+        
+        # ---- 健康/感情/家庭 ----
+        if 'details' in monthly_reading:
+            det = monthly_reading['details']
+            content += f'''
+            <div class="card"><div class="card-header"><span class="card-icon">🏥</span><span class="card-title">八字之神·健康提醒</span></div>
+            <p class="card-text">{det["health"]}</p></div>
+            <div class="card"><div class="card-header"><span class="card-icon">💕</span><span class="card-title">八字之神·感情提醒</span></div>
+            <p class="card-text">{det["love"]}</p></div>
+            <div class="card"><div class="card-header"><span class="card-icon">👨‍👩‍👧</span><span class="card-title">八字之神·家庭提醒</span></div>
+            <p class="card-text">{det["family"]}</p></div>'''
+        
+        self._send_html(self._page(content, 'report'))
 # ============================================================
 #  启动
 # ============================================================
