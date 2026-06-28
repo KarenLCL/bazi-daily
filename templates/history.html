@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-history">
+    
+    <h2 class="page-title">📊 反馈记录</h2>
+    <p class="page-subtitle">你的反馈越多，我的预测越准</p>
+
+    <!-- 统计 -->
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.total }}</div>
+            <div class="stat-label">累计反馈</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.avg_accuracy }}</div>
+            <div class="stat-label">平均准确率</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.avg_actual }}</div>
+            <div class="stat-label">平均感受</div>
+        </div>
+    </div>
+
+    <!-- 反馈列表 -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">📋</span>
+            <span class="card-title">反馈历史</span>
+        </div>
+        
+        {% if feedbacks %}
+        <div class="feedback-list">
+            {% for fb in feedbacks %}
+            <div class="feedback-item">
+                <div class="fb-header">
+                    <a href="/date/{{ fb.date }}" class="fb-date">{{ fb.date }}</a>
+                    <span class="fb-level" style="background: {% if fb.prediction_level == '大吉' %}#c8e6c9{% elif fb.prediction_level == '吉' %}#dcedc8{% elif fb.prediction_level == '平' %}#fff9c4{% elif fb.prediction_level == '不佳' %}#ffe0b2{% else %}#ffcdd2{% endif %}">
+                        {{ fb.prediction_level }}
+                    </span>
+                    <span class="fb-score">{{ fb.prediction_score }}分</span>
+                </div>
+                {% if fb.actual_feedback %}
+                <p class="fb-content">{{ fb.actual_feedback[:200] }}{% if fb.actual_feedback|length > 200 %}…{% endif %}</p>
+                {% endif %}
+                <div class="fb-ratings">
+                    {% if fb.actual_rating %}
+                    <span>感受: {% for i in range(fb.actual_rating) %}★{% endfor %}{% for i in range(5 - fb.actual_rating) %}☆{% endfor %}</span>
+                    {% endif %}
+                    {% if fb.accuracy_rating %}
+                    <span>准确度: {% for i in range(fb.accuracy_rating) %}★{% endfor %}{% for i in range(5 - fb.accuracy_rating) %}☆{% endfor %}</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="card-text card-sub">还没有反馈记录。每天看完运势后，记得回来记录一下今天的实际情况哦！</p>
+        {% endif %}
+    </div>
+
+    <!-- 使用提示 -->
+    <div class="card card-reminder">
+        <div class="card-header">
+            <span class="card-icon">💡</span>
+            <span class="card-title">使用流程</span>
+        </div>
+        <ol class="usage-steps">
+            <li>🌅 早上打开「今日」页面看运势</li>
+            <li>📝 晚上在「日记」页面记录今天发生的事</li>
+            <li>⭐ 在运势页面反馈「今天的预测准不准」</li>
+            <li>📊 反馈越多，算法校准越精准</li>
+        </ol>
+    </div>
+
+</div>
+{% endblock %}

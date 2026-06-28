@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🌟 专属命理 · Karen</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+</head>
+<body>
+    <nav class="top-nav">
+        <div class="nav-inner">
+            <a href="/" class="nav-logo">🌟 命理</a>
+            <div class="nav-links">
+                <a href="/" class="nav-item {% if request.path == '/' %}active{% endif %}">今日</a>
+                <a href="/monthly" class="nav-item {% if 'monthly' in request.path %}active{% endif %}">本月</a>
+                <a href="/yearly" class="nav-item {% if 'yearly' in request.path %}active{% endif %}">本年</a>
+                <a href="/diary" class="nav-item {% if 'diary' in request.path %}active{% endif %}">日记</a>
+                <a href="/history" class="nav-item {% if 'history' in request.path %}active{% endif %}">记录</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <p>✨ 辛金日主 · 喜土金 · 忌木火</p>
+        <p class="footer-small">专属定制 · 基于已验证命盘</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

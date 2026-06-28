@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-monthly">
+    
+    <div class="date-nav">
+        <a href="/monthly?year={% if current_month == 1 %}{{ current_year - 1 }}{% else %}{{ current_year }}{% endif %}&month={% if current_month == 1 %}12{% else %}{{ current_month - 1 }}{% endif %}" class="date-arrow">‹</a>
+        <div class="date-center">
+            <h2 class="date-main">{{ current_year }}年{{ current_month }}月</h2>
+            <span class="date-lunar">{{ reading.month_pillar }}</span>
+        </div>
+        <a href="/monthly?year={% if current_month == 12 %}{{ current_year + 1 }}{% else %}{{ current_year }}{% endif %}&month={% if current_month == 12 %}1{% else %}{{ current_month + 1 }}{% endif %}" class="date-arrow">›</a>
+    </div>
+
+    <!-- 月度评分 -->
+    <div class="score-card" style="background: 
+        {% if reading.level == '大吉' %}#e8f5e9
+        {% elif reading.level == '吉' %}#f1f8e9
+        {% elif reading.level == '平' %}#fff8e1
+        {% elif reading.level == '不佳' %}#fff3e0
+        {% else %}#fbe9e7{% endif %}">
+        <div class="score-circle" data-score="{{ reading.avg_score }}">
+            <div class="score-number">{{ "%.0f"|format(reading.avg_score) }}</div>
+            <div class="score-label">月均</div>
+        </div>
+        <div class="score-info">
+            <div class="score-level">{{ reading.level }}</div>
+            <div class="score-pillar">大运: {{ reading.current_dayun.name }}</div>
+            <div class="score-element">{{ reading.current_dayun.age }}岁 · {{ reading.current_dayun.start }}-{{ reading.current_dayun.end }}</div>
+        </div>
+    </div>
+
+    <!-- 月度关键日 -->
+    {% if reading.key_dates.good_days %}
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">✅</span>
+            <span class="card-title">吉日推荐</span>
+        </div>
+        <div class="date-list">
+            {% for d in reading.key_dates.good_days %}
+            <a href="/date/{{ d.date.strftime('%Y/%m/%d') }}" class="date-item date-good">
+                <span class="date-day">{{ d.date.strftime('%m月%d日') }}</span>
+                <span class="date-pillar">{{ d.pillar }}</span>
+                <span class="date-score">{{ d.score }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if reading.key_dates.bad_days %}
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">⚠️</span>
+            <span class="card-title">需谨慎日</span>
+        </div>
+        <div class="date-list">
+            {% for d in reading.key_dates.bad_days %}
+            <a href="/date/{{ d.date.strftime('%Y/%m/%d') }}" class="date-item date-bad">
+                <span class="date-day">{{ d.date.strftime('%m月%d日') }}</span>
+                <span class="date-pillar">{{ d.pillar }}</span>
+                <span class="date-score">{{ d.score }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 本月日运一览 -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">📅</span>
+            <span class="card-title">日运日历</span>
+        </div>
+        <div class="mini-calendar">
+            {% for d in reading.key_dates.all %}
+            <a href="/date/{{ d.date.strftime('%Y/%m/%d') }}" 
+               class="mini-day" 
+               style="background: {% if d.score >= 70 %}#c8e6c9{% elif d.score >= 50 %}#fff9c4{% elif d.score >= 35 %}#ffe0b2{% else %}#ffcdd2{% endif %}">
+                <span class="mini-day-num">{{ d.date.day }}</span>
+                <span class="mini-day-score">{{ d.score }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}

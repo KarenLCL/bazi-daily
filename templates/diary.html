@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-diary">
+    
+    <h2 class="page-title">📝 每日日记</h2>
+    <p class="page-subtitle">记录今天发生了什么，帮助命理算法更精准</p>
+
+    <!-- 写日记 -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">✏️</span>
+            <span class="card-title">今日记录 · {{ today.strftime('%Y年%m月%d日') }}</span>
+        </div>
+        <form id="diary-form" onsubmit="return submitDiary(event)">
+            <textarea name="content" rows="5" class="diary-input" placeholder="今天发生了什么？有什么开心的事、困扰的事、或者有趣的事？&#10;&#10;💡 你可以用手机语音输入法，直接说话转文字更方便哦！"></textarea>
+            
+            <div class="diary-extras">
+                <div class="diary-mood">
+                    <label>心情：</label>
+                    <select name="mood" class="mood-select">
+                        <option value="5">😄 很好</option>
+                        <option value="4">🙂 不错</option>
+                        <option value="3">😐 一般</option>
+                        <option value="2">😔 不好</option>
+                        <option value="1">😢 很差</option>
+                    </select>
+                </div>
+                <div class="diary-category">
+                    <label>类别：</label>
+                    <select name="category" class="category-select">
+                        <option value="日常">日常</option>
+                        <option value="工作">工作</option>
+                        <option value="感情">感情</option>
+                        <option value="家庭">家庭</option>
+                        <option value="健康">健康</option>
+                        <option value="社交">社交</option>
+                        <option value="学习">学习</option>
+                        <option value="其他">其他</option>
+                    </select>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">保存日记</button>
+        </form>
+        <div id="diary-success" class="hidden" style="color: #2e7d32; margin-top: 10px;">✅ 日记已保存！</div>
+    </div>
+
+    <!-- 最近日记 -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">📖</span>
+            <span class="card-title">最近记录</span>
+        </div>
+        
+        {% if diaries %}
+        <div class="diary-list">
+            {% for entry in diaries %}
+            <div class="diary-item">
+                <div class="diary-item-header">
+                    <span class="diary-date">{{ entry.date }}</span>
+                    <span class="diary-time">{{ entry.entry_time }}</span>
+                    <span class="diary-mood-badge">
+                        {% if entry.mood == '5' %}😄{% elif entry.mood == '4' %}🙂{% elif entry.mood == '3' %}😐{% elif entry.mood == '2' %}😔{% elif entry.mood == '1' %}😢{% endif %}
+                    </span>
+                    <span class="diary-cat-badge">{{ entry.category }}</span>
+                </div>
+                <p class="diary-content">{{ entry.content[:150] }}{% if entry.content|length > 150 %}…{% endif %}</p>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="card-text card-sub">还没有日记记录，开始记录今天吧！</p>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function submitDiary(event) {
+    event.preventDefault();
+    const form = document.getElementById('diary-form');
+    const formData = new FormData(form);
+    
+    const data = {};
+    formData.forEach((value, key) => {
+        if (key === 'mood') data[key] = parseInt(value);
+        else data[key] = value;
+    });
+    data.date = '{{ today.isoformat() }}';
+    
+    fetch('/api/diary', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'ok') {
+            document.getElementById('diary-success').classList.remove('hidden');
+            document.querySelector('.diary-input').value = '';
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            alert('保存失败: ' + data.error);
+        }
+    })
+    .catch(err => alert('网络错误'));
+    return false;
+}
+</script>
+{% endblock %}

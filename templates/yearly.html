@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-yearly">
+    
+    <div class="date-nav">
+        <a href="/yearly?year={{ current_year - 1 }}" class="date-arrow">‹</a>
+        <div class="date-center">
+            <h2 class="date-main">{{ current_year }}年</h2>
+            <span class="date-lunar">{{ reading.year_pillar }} · {{ reading.year_ten_god }}</span>
+        </div>
+        <a href="/yearly?year={{ current_year + 1 }}" class="date-arrow">›</a>
+    </div>
+
+    <!-- 年度评分 -->
+    <div class="score-card" style="background: 
+        {% if reading.level == '大吉' %}#e8f5e9
+        {% elif reading.level == '吉' %}#f1f8e9
+        {% elif reading.level == '平' %}#fff8e1
+        {% elif reading.level == '不佳' %}#fff3e0
+        {% else %}#fbe9e7{% endif %}">
+        <div class="score-circle" data-score="{{ reading.avg_score }}">
+            <div class="score-number">{{ "%.0f"|format(reading.avg_score) }}</div>
+            <div class="score-label">年均</div>
+        </div>
+        <div class="score-info">
+            <div class="score-level">{{ reading.level }}</div>
+            <div class="score-pillar">{{ reading.year_pillar }} · 年干为{{ reading.year_ten_god }}</div>
+            <div class="score-element">{{ "喜用神" if reading.is_favorable_year else "忌神" }}之年</div>
+        </div>
+    </div>
+
+    <!-- 年度关键词 -->
+    {% if reading.keywords %}
+    <div class="card card-highlight">
+        <div class="card-header">
+            <span class="card-icon">🔮</span>
+            <span class="card-title">年度解读</span>
+        </div>
+        {% if reading.keywords is string %}
+        <p class="card-text">{{ reading.keywords }}</p>
+        {% elif reading.keywords is mapping %}
+        <div class="keyword-row">
+            {% for kw in reading.keywords.keywords %}
+            <span class="keyword-tag">{{ kw }}</span>
+            {% endfor %}
+        </div>
+        <p class="card-text">{{ reading.keywords.message }}</p>
+        {% elif reading.keywords is iterable %}
+        <div class="keyword-row">
+            {% for kw in reading.keywords %}
+            <span class="keyword-tag">{{ kw }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- 大运信息 -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">🔄</span>
+            <span class="card-title">大运 · {{ reading.current_dayun.name }}</span>
+            <span class="card-badge">{{ reading.current_dayun.age }}岁</span>
+        </div>
+        <p class="card-text">起止: {{ reading.current_dayun.start }} - {{ reading.current_dayun.end }}</p>
+        <p class="card-text card-sub">
+            {% if reading.current_dayun.name == '乙酉' %}
+            ⭐ 这是你的黄金大运！禄神帮身，身弱变强，大胆追求事业和人生的突破。
+            {% elif reading.current_dayun.name == '丙戌' %}
+            🔶 仍在丙戌运末期，火土运即将结束。2026年10月后换入乙酉大运。
+            {% endif %}
+        </p>
+    </div>
+
+    <!-- 月度走势 -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">📈</span>
+            <span class="card-title">月度走势</span>
+        </div>
+        <div class="month-chart">
+            {% for m in reading.monthly_overview %}
+            <div class="month-bar-wrapper">
+                <div class="month-bar" 
+                     style="height: {{ m.score }}px; 
+                            background: {% if m.score >= 70 %}#4caf50{% elif m.score >= 50 %}#ffc107{% else %}#ff7043{% endif %};"
+                     title="{{ m.month }}月: {{ m.score }}分 ({{ m.level }})">
+                </div>
+                <span class="month-label">{{ m.month }}月</span>
+                <span class="month-score">{{ "%.0f"|format(m.score) }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- 逐月详情 -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">📋</span>
+            <span class="card-title">月运详情</span>
+        </div>
+        <div class="month-detail-list">
+            {% for m in reading.monthly_overview %}
+            <a href="/monthly?year={{ current_year }}&month={{ m.month }}" class="month-detail-item">
+                <span class="month-detail-name">{{ m.month }}月</span>
+                <span class="month-detail-pillar">{{ m.pillar }}</span>
+                <span class="month-detail-level" style="color: {% if m.score >= 70 %}#2e7d32{% elif m.score >= 50 %}#f57f17{% else %}#c62828{% endif %}">
+                    {{ m.level }}
+                </span>
+                <span class="month-detail-score">{{ "%.0f"|format(m.score) }}分</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- 往年年鉴 -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">📚</span>
+            <span class="card-title">切换年份</span>
+        </div>
+        <div class="year-grid">
+            {% for y in range(current_year - 3, current_year + 4) %}
+            <a href="/yearly?year={{ y }}" class="year-item {% if y == current_year %}year-current{% endif %}">
+                {{ y }}年
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}

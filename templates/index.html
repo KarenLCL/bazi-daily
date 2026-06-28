@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-daily" data-date="{{ reading.date.isoformat() }}">
+    
+    <!-- ===== 日期 & 导航 ===== -->
+    <div class="date-nav">
+        <a href="/date/{{ (reading.date - days(1)).strftime('%Y/%m/%d') }}" class="date-arrow">‹</a>
+        <div class="date-center">
+            <h2 class="date-main">{{ reading.date.strftime('%Y年%m月%d日') }}</h2>
+            <span class="date-weekday">{{ ['周一','周二','周三','周四','周五','周六','周日'][reading.date.weekday()] }}</span>
+            {% if reading.interpretation.overview.lunar_info %}
+            <span class="date-lunar">{{ reading.interpretation.overview.lunar_info.lunar_month }} {{ reading.interpretation.overview.lunar_info.lunar_day }}</span>
+            {% endif %}
+        </div>
+        <a href="/date/{{ (reading.date + days(1)).strftime('%Y/%m/%d') }}" class="date-arrow">›</a>
+    </div>
+
+    <!-- ===== 运势评分 ===== -->
+    <div class="score-card" style="background: {{ reading.score.color }}">
+        <div class="score-circle" data-score="{{ reading.score.score }}">
+            <div class="score-number">{{ reading.score.score }}</div>
+            <div class="score-label">分</div>
+        </div>
+        <div class="score-info">
+            <div class="score-level {{ reading.score.level }}">{{ reading.score.level }}</div>
+            <div class="score-pillar">{{ reading.daily_bazi.day.name }} · {{ reading.daily_bazi.day.nayin }}</div>
+            <div class="score-element">
+                天干{{ reading.interpretation.overview.stem_element }} · 
+                地支{{ reading.interpretation.overview.branch_element }}
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 概览 ===== -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">📋</span>
+            <span class="card-title">今日总览</span>
+        </div>
+        <p class="card-text">{{ reading.interpretation.overview.summary }}</p>
+        <p class="card-text card-sub">{{ reading.interpretation.overview.element_note }}</p>
+    </div>
+
+    <!-- ===== 大运提示 ===== -->
+    <div class="card card-highlight">
+        <div class="card-header">
+            <span class="card-icon">🔄</span>
+            <span class="card-title">大运 · {{ reading.current_dayun.name }}</span>
+            <span class="card-badge">{{ reading.current_dayun.age }}岁</span>
+        </div>
+        <p class="card-text">{{ reading.interpretation.career.dayun_effect }}</p>
+    </div>
+
+    <!-- ===== 事业财运 ===== -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">💼</span>
+            <span class="card-title">事业财运</span>
+        </div>
+        <p class="card-text">{{ reading.interpretation.career.ten_god_reading }}</p>
+        
+        {% if reading.interpretation.career.branch_effects %}
+        <div class="card-list">
+            {% for effect in reading.interpretation.career.branch_effects %}
+            <div class="list-item list-item-warn">⚠ {{ effect }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="tag-row">
+            <span class="tag {{ 'tag-good' if reading.interpretation.career.is_favorable_day else 'tag-bad' }}">
+                {% if reading.interpretation.career.is_favorable_day %}✅ 用神日{% else %}⚠ 忌神日{% endif %}
+            </span>
+            <span class="tag tag-info">十神: {{ reading.interpretation.career.ten_god }}</span>
+        </div>
+    </div>
+
+    <!-- ===== 感情人际 ===== -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">💕</span>
+            <span class="card-title">感情人际</span>
+        </div>
+        <p class="card-text">{{ reading.interpretation.relationship.ten_god_reading }}</p>
+        <p class="card-text card-sub">{{ reading.interpretation.relationship.gu_chen_tip }}</p>
+    </div>
+
+    <!-- ===== 健康提示 ===== -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">🏥</span>
+            <span class="card-title">健康提示</span>
+        </div>
+        {% for tip in reading.interpretation.health.tips %}
+        <p class="card-text">• {{ tip }}</p>
+        {% endfor %}
+        <details class="card-details">
+            <summary>个人体质提示</summary>
+            {% for tip in reading.interpretation.health.personal_tips %}
+            <p class="card-text card-sub">• {{ tip }}</p>
+            {% endfor %}
+        </details>
+    </div>
+
+    <!-- ===== 父母/家庭 ===== -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">👨‍👩‍👧</span>
+            <span class="card-title">父母 / 家庭</span>
+        </div>
+        {% for note in reading.interpretation.family.notes %}
+        <p class="card-text">• {{ note }}</p>
+        {% endfor %}
+    </div>
+
+    <!-- ===== 宜忌 ===== -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">✅</span>
+            <span class="card-title">今日宜忌</span>
+        </div>
+        <div class="advice-col">
+            <div class="advice-good">
+                <h4>✅ 宜</h4>
+                <ul>
+                {% for item in reading.interpretation.advice.favorable %}
+                    <li>{{ item }}</li>
+                {% endfor %}
+                </ul>
+            </div>
+            <div class="advice-bad">
+                <h4>❌ 不宜</h4>
+                <ul>
+                {% for item in reading.interpretation.advice.unfavorable %}
+                    <li>{{ item }}</li>
+                {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== 专属提醒 ===== -->
+    <div class="card card-reminder">
+        <div class="card-header">
+            <span class="card-icon">🔔</span>
+            <span class="card-title">专属提醒</span>
+        </div>
+        {% for reminder in reading.interpretation.reminders %}
+        <p class="card-text">• {{ reminder }}</p>
+        {% endfor %}
+    </div>
+
+    <!-- ===== 辰时解读 ===== -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-icon">🌅</span>
+            <span class="card-title">晨起 · 辰时 (7-9点)</span>
+        </div>
+        <p class="card-text">{{ reading.hour_reading.description }}</p>
+        <p class="card-text card-sub">{{ reading.hour_reading.ten_god_reading }}</p>
+    </div>
+
+    <!-- ===== 反馈区 ===== -->
+    <div class="card card-feedback" id="feedback-section">
+        <div class="card-header">
+            <span class="card-icon">📝</span>
+            <span class="card-title">今日反馈</span>
+        </div>
+        
+        {% if has_feedback %}
+        <div class="feedback-exists">
+            <p>✅ 已记录今日反馈</p>
+            {% if feedback.actual_feedback %}
+            <p class="card-sub">你写的: {{ feedback.actual_feedback[:100] }}{% if feedback.actual_feedback|length > 100 %}...{% endif %}</p>
+            {% endif %}
+            <button onclick="editFeedback()" class="btn btn-sm">修改</button>
+        </div>
+        {% endif %}
+        
+        <form id="feedback-form" class="feedback-form {% if has_feedback %}hidden{% endif %}" onsubmit="return submitFeedback(event)">
+            <input type="hidden" name="date" value="{{ reading.date.isoformat() }}">
+            <input type="hidden" name="prediction_score" value="{{ reading.score.score }}">
+            <input type="hidden" name="prediction_level" value="{{ reading.score.level }}">
+            
+            <textarea name="actual_feedback" rows="3" placeholder="今天过得怎么样？记录一下今天实际发生的事…" class="feedback-input"></textarea>
+            
+            <div class="feedback-ratings">
+                <div class="rating-group">
+                    <label>今天整体感受</label>
+                    <div class="stars" data-name="actual_rating">
+                        {% for i in range(1, 6) %}
+                        <span class="star" data-value="{{ i }}" onclick="setRating(this)">☆</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="rating-group">
+                    <label>预测准确度</label>
+                    <div class="stars" data-name="accuracy_rating">
+                        {% for i in range(1, 6) %}
+                        <span class="star" data-value="{{ i }}" onclick="setRating(this)">☆</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">提交反馈</button>
+        </form>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function days(n) {
+    return n * 86400000;
+}
+
+function submitFeedback(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    const data = {};
+    formData.forEach((value, key) => {
+        if (key === 'actual_rating' || key === 'accuracy_rating') {
+            data[key] = parseInt(value) || null;
+        } else {
+            data[key] = value;
+        }
+    });
+    
+    fetch('/api/feedback', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'ok') {
+            alert('✅ 反馈已保存，谢谢！');
+            document.getElementById('feedback-form').classList.add('hidden');
+            location.reload();
+        } else {
+            alert('保存失败: ' + data.error);
+        }
+    })
+    .catch(err => alert('网络错误'));
+    return false;
+}
+
+function setRating(el) {
+    const container = el.parentElement;
+    const value = parseInt(el.dataset.value);
+    const name = container.dataset.name;
+    
+    // 隐藏的input
+    let hidden = container.querySelector('input[type="hidden"]');
+    if (!hidden) {
+        hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = name;
+        container.appendChild(hidden);
+    }
+    hidden.value = value;
+    
+    // 更新星标
+    const stars = container.querySelectorAll('.star');
+    stars.forEach((s, i) => {
+        s.textContent = i < value ? '★' : '☆';
+        s.classList.toggle('active', i < value);
+    });
+}
+
+function editFeedback() {
+    document.getElementById('feedback-form').classList.remove('hidden');
+}
+</script>
+{% endblock %}
