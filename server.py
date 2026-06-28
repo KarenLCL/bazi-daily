@@ -204,7 +204,20 @@ HTML_FOOT = '''</main>
 function setRating(el){var c=el.parentElement,v=parseInt(el.dataset.value),n=c.dataset.name;var h=c.querySelector('input[type=hidden]');if(!h){h=document.createElement('input');h.type='hidden';h.name=n;c.appendChild(h)}h.value=v;var s=c.querySelectorAll('.star');s.forEach(function(x,i){x.textContent=i<v?'★':'☆';x.classList.toggle('active',i<v)})}
 function submitFeedback(e){e.preventDefault();var f=e.target,d={};new FormData(f).forEach(function(v,k){if(k==='actual_rating'||k==='accuracy_rating')d[k]=parseInt(v)||null;else d[k]=v});fetch('/api/feedback',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json()}).then(function(d){if(d.status==='ok'){alert('✅ 反馈已保存！');location.reload()}else alert('保存失败: '+d.error}).catch(function(){alert('网络错误')});return false}
 function submitDiary(e){e.preventDefault();var f=document.getElementById('diary-form'),d={};new FormData(f).forEach(function(v,k){if(k==='mood')d[k]=parseInt(v);else d[k]=v});fetch('/api/diary',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json()}).then(function(d){if(d.status==='ok'){alert('✅ 日记已保存！');location.reload()}else alert('保存失败: '+d.error}).catch(function(){alert('网络错误')});return false}
-function editFeedback(){var f=document.getElementById('feedback-form');f.classList.remove('hidden');var fbText=f.querySelector('[name=actual_feedback]');if(fbText){var existing=document.querySelector('.feedback-exists');if(existing){var shortText=existing.querySelector('.card-sub');if(shortText){fbText.value=shortText.textContent.replace('你写的: ','')}}}}
+function editFeedback(){
+  var f=document.getElementById('feedback-form');
+  if(!f)return;
+  f.classList.remove('hidden');
+  // 尝试预填已有文字
+  var ta=f.querySelector('[name=actual_feedback]');
+  if(!ta)return;
+  var preview=document.querySelector('.feedback-exists .fb-content, .feedback-exists .card-sub');
+  if(preview){
+    var txt=preview.textContent||'';
+    txt=txt.replace('你写的: ','');
+    if(txt&&ta.value=='') ta.value=txt;
+  }
+}
 function toggleVoiceInput(){var t=document.getElementById('diary-input');var s=document.getElementById('voice-status');if(!window.SpeechRecognition&&!window.webkitSpeechRecognition){alert('您的浏览器不支持语音输入。建议使用Chrome浏览器，或者用手机自带的语音键盘输入。');return}var r=window.SpeechRecognition||window.webkitSpeechRecognition;var rec=new r();rec.lang='zh-CN';rec.interimResults=true;var btn=document.getElementById('voice-btn');btn.textContent='⏹️';btn.style.borderColor='#c62828';s.style.display='block';rec.onresult=function(e){var res='';for(var i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)res+=e.results[i][0].transcript}t.value+=res};rec.onend=function(){btn.textContent='🎤';btn.style.borderColor='#e0e0e0';s.style.display='none'};rec.onerror=function(){btn.textContent='🎤';btn.style.borderColor='#e0e0e0';s.style.display='none';alert('语音识别出错，请重试或使用手机语音键盘输入')};rec.start()}
 function submitPlan(e){e.preventDefault();var f=document.getElementById('plan-form'),d={};new FormData(f).forEach(function(v,k){d[k]=v});fetch('/api/plans',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)}).then(function(r){return r.json()}).then(function(d){if(d.status==='ok'){alert('✅ 已记录！');location.reload()}else alert('添加失败: '+d.error}).catch(function(){alert('网络错误')});return false}
 function deletePlan(id){if(!confirm('确定删除这条记录？'))return;fetch('/api/plans/'+id,{method:'DELETE'}).then(function(r){return r.json()}).then(function(d){if(d.status==='ok'){location.reload()}else alert('删除失败')})}
