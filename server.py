@@ -522,6 +522,7 @@ class BaziHandler(BaseHTTPRequestHandler):
     def _serve_daily(self, target_date):
         reading = interpreter.generate_daily_reading(target_date)
         fb = get_feedback_by_date(target_date.isoformat())
+        birth_day_stem = BIRTH_CHART["day"]["stem"]
         r = reading
         i = r['interpretation']
         o = i['overview']
@@ -606,7 +607,7 @@ class BaziHandler(BaseHTTPRequestHandler):
                 int_html += f'<p class="card-text card-sub">• {it["desc"]} ({it["force"]:+d})</p>'
             content += f'''
             <div class="card"><div class="card-header"><span class="card-icon">⚡</span><span class="card-title">力场分析</span><span class="card-badge">{vf["total_score"]}分</span></div>
-            <p class="card-text">{vf["summary"]}</p>
+            <p class="card-text" style="background:#fff;padding:12px;border-radius:8px;margin:6px 0;line-height:1.8">{vf["narrative"]}</p>
             <div style="margin:12px 0">{bars_html}</div>
             <details><summary style="font-size:13px;color:#888;cursor:pointer">▼ 十二长生</summary><div class="life-grid">{ls_html}</div></details>
             <details><summary style="font-size:13px;color:#888;cursor:pointer;margin-top:8px">▼ 地支交互力</summary><div style="margin-top:6px">{int_html}</div></details>
@@ -666,6 +667,25 @@ class BaziHandler(BaseHTTPRequestHandler):
             <p class="card-text card-sub">准确度: {y_stars} | 预测{y_score}分</p>
             <p class="card-text" style="margin-top:6px">📌 昨日地支「{yest_e}」→ {ny_s} → 今日地支「{today_e}」：{explain}</p>
             <p class="card-text" style="background:#fff;padding:12px;border-radius:8px;margin:4px 0">💡 {story}</p></div>'''
+        
+        # ---- 当日印证（今日有反馈时） ----
+        if fb and fb.get('actual_feedback'):
+            fb_txt = fb['actual_feedback'][:200]
+            fb_acc = fb.get('accuracy_rating', 0) or 0
+            fb_stars = '★'*fb_acc + '☆'*(5-fb_acc)
+            tg_name = c['ten_god']
+            is_good = c['is_favorable_day']
+            ds2, db2 = get_day_stem_branch(target_date)
+            stage_name2 = get_life_stage(birth_day_stem, db2)[1]
+            confirm = '印证了' if fb_acc >= 3 else '值得留意的是'
+            content += f'''
+            <div class="card" style="background:#f5f0eb;border-left:4px solid {"#bf8f00" if fb_acc>=3 else "#e0e0e0"}">
+            <div class="card-header"><span class="card-icon">✔️</span><span class="card-title">当日印证</span></div>
+            <p class="card-text card-sub">今天早上的预测：{tg_name}日，{'用神' if is_good else '忌神'}日，{o['summary']}</p>
+            <p class="card-text card-sub">你实际经历的：「{fb_txt}」</p>
+            <p class="card-text" style="margin-top:6px">🔍 你评准确度 {fb_stars}——{confirm}今天早上的判断。</p>
+            <p class="card-text card-sub">太阳底下没有新鲜事，八字就是能量运行的规律。你今天的体验，是辛金在{stage_name2}日的又一次印证。</p>
+            </div>'''
         
         # 智慧库
         try:

@@ -227,7 +227,70 @@ class ForceEngine:
             "interactions": interactions,
             "dayun": current_dayun,
             "summary": self._generate_summary(total_force, levels, interactions),
+            "narrative": self._synthesize_narrative(du_power, y_power, m_power, d_power, levels, interactions, master_states, current_dayun),
         }
+    
+    def _synthesize_narrative(self, du_power, y_power, m_power, d_power, levels, interactions, master_states, dayun) -> str:
+        """生成综合推演叙事，而非逐项罗列"""
+        parts = []
+        
+        # 大运基调
+        if du_power >= 10:
+            parts.append(f"你在{dayun['name']}大运中，整体能量有托底（+{du_power}），这是你当前最大的优势。")
+        elif du_power >= 5:
+            parts.append(f"当前{dayun['name']}大运对你有些帮助（+{du_power}），但力量不算强。")
+        else:
+            parts.append(f"当前{dayun['name']}大运对你帮助有限（{du_power}），更多要靠自己。")
+        
+        # 流年vs大运的博弈
+        if y_power < 0 and du_power > 0:
+            parts.append(f"不过流年（{y_power}）对你形成压制，和大运的方向相反。说明今年大环境并不配合你，但大运兜住了底线——不至于太差，也不容易有大突破。")
+        elif y_power > 0 and du_power > 0:
+            parts.append(f"流年（+{y_power}）和大运方向一致，今年整体对你有利，值得把握。")
+        elif y_power < 0 and du_power < 0:
+            parts.append(f"流年（{y_power}）和大运都在压制，这两年以守为主。")
+        
+        # 流月
+        if m_power < -3:
+            parts.append(f"本月（{m_power}）延续了流年的压制态势，这个月依然不太轻松。")
+        elif m_power > 3:
+            parts.append(f"本月（+{m_power}）给你了一些喘息空间，可以利用这段时间。")
+        else:
+            parts.append(f"本月能量中性（{m_power}），不上不下。")
+        
+        # 流日
+        if d_power > 0:
+            parts.append(f"今天（+{d_power}）是本月里相对好的一天，但好的程度有限——在小级别回暖，不改大级别的基调。")
+        elif d_power < 0:
+            parts.append(f"今天（{d_power}）是本月里偏弱的一天，适合低调度过。")
+        else:
+            parts.append(f"今天（{d_power}）在本月里算是平常的一天。")
+        
+        # 十二长生状态
+        for k, v in master_states.items():
+            if k == "日主在流日":
+                stage = v[1]
+                power = v[2]
+                if power >= 0.8:
+                    parts.append(f"辛金今日在流日地支为「{stage}」，能量处于高位（{power:.1f}），身弱得助。")
+                elif power <= 0.3:
+                    parts.append(f"辛金今日在流日地支为「{stage}」，能量处于低位（{power:.1f}），身弱者更弱，不宜过度消耗。")
+                else:
+                    parts.append(f"辛金今日在流日地支为「{stage}」（{power:.1f}），能量一般。")
+                break
+        
+        # 综合
+        dominant = max(levels, key=lambda x: abs(x['power'])) if levels else None
+        if dominant:
+            net = sum(l['power'] for l in levels)
+            if net > 10:
+                parts.append(f"综合来看，今日吉力量稍大于凶力量（净+{net}），但差距不大，适合平稳度过，不宜冒进。")
+            elif net < -10:
+                parts.append(f"综合来看，今日压制力量偏强（净{net}），宜静不宜动。")
+            else:
+                parts.append(f"综合来看，今日吉凶力量相当（净{net}），最好的策略是按部就班，不做重大决策。")
+        
+        return '\n'.join(parts)
     
     def _rel_description(self, relation: str, b1: int, b2: int) -> str:
         """地支关系讲解"""
