@@ -32,6 +32,7 @@ from plans_module import (
     get_recent_plans, delete_plan,
 )
 from wisdom_engine import wisdom_engine
+from force_engine import force_engine, LIFE_STAGE_NAMES, get_life_stage
 
 interpreter = PersonalizedInterpreter()
 HOST = '0.0.0.0'
@@ -123,6 +124,22 @@ a{text-decoration:none;color:inherit}
 .star.active,.star.active~.star{color:#ff8f00}
 .star:hover,.star:hover~.star{color:#ffb300}
 .star-hint{font-size:11px;color:#aaa;margin-top:2px;display:block}
+.force-bar{display:flex;align-items:center;gap:8px;margin:6px 0}
+.force-track{flex:1;height:20px;background:#f0f0f0;border-radius:10px;overflow:hidden}
+.force-fill{height:100%;border-radius:10px;transition:width .5s;min-width:4px}
+.force-good{background:linear-gradient(90deg,#fff8e1,#bf8f00)}
+.force-bad{background:linear-gradient(90deg,#efebe9,#795548)}
+.force-neutral{background:#e0e0e0}
+.force-label{width:40px;font-size:13px;color:#555;text-align:right}
+.force-value{width:40px;font-size:13px;font-weight:600;text-align:left}
+.force-value.pos{color:#8d6e00}
+.force-value.neg{color:#795548}
+.life-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.life-item{font-size:13px;padding:6px 10px;background:#fafafa;border-radius:8px;display:flex;justify-content:space-between}
+.life-stage{display:inline-block;padding:2px 8px;border-radius:8px;font-size:11px}
+.stage-strong{background:#fff8e1;color:#8d6e00}
+.stage-weak{background:#efebe9;color:#795548}
+.stage-mid{background:#f5f5f5;color:#666}
 .btn{padding:10px 24px;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s}
 .btn-primary{background:#5d4037;color:#fff;width:100%}
 .btn-primary:hover{background:#4e342e}
@@ -557,16 +574,42 @@ class BaziHandler(BaseHTTPRequestHandler):
             ny_s = '、'.join(ny_rel) if ny_rel else '平'
             today_e = EARTHLY_BRANCHES[db]
             yest_e = EARTHLY_BRANCHES[y_branch]
-            extra = ''
-            if db == 8:
-                extra = ' 今天又是巳申合日，再次提醒：能量容易外泄，重要的事上午做完，下午留时间独处充电。'
+            
+            # ---- 八字关系讲解 ----
+            rel_meaning = {
+                '合': '能量汇聚或外泄，容易与人合作或被事情牵住',
+                '冲': '能量对冲，易有突发变化或情绪波动',
+                '刑': '能量纠结，易有小摩擦或思虑过多',
+                '害': '能量暗耗，看似平顺实则有些事不太顺心',
+                '三合': '能量共振，适合协作和推进',
+                '自刑': '自我纠结，容易想太多',
+                '平': '能量平稳过渡',
+            }
+            # 组合讲解
+            explanations = []
+            for r in ny_rel:
+                explanations.append(rel_meaning.get(r, f'{r}关系'))
+            explain_text = '；'.join(explanations) if explanations else '能量平稳过渡'
+            
+            # 今日→昨日关系故事
+            story = ''
+            if y_branch == 9 and db == 10:  # 酉→戌 害
+                story = '昨天是你的禄神日（酉金），能量充沛。今天转戌土，酉戌相害，昨天的好状态不会直接延续——不要因为昨天状态好就今天硬撑，适当调整节奏。'
+            elif y_branch == 8 and db == 5:  # 申→巳 合
+                story = '昨天申日与你的日支巳相合，有没有感觉能量被合走？今天巳日，合的力量还在延续，继续注意不要过度消耗。'
+            elif y_branch == 6 and db == 0:  # 午→子 冲
+                story = '昨天午火日，今天子水日，午子相冲，能量两极反转。情绪上可能有起伏，注意稳住。'
+            elif db == 9:  # 今天是酉日
+                story = '今天是你的禄神日（酉金）！昨天不管状态如何，今天都会感觉能量回升。把握今天推进重要事项。'
+            
             content += f'''
             <div class="card" style="background:#f5f0eb">
             <div class="card-header"><span class="card-icon">📖</span><span class="card-title">八字之神·昨日回顾</span></div>
             <p class="card-text card-sub">昨日({yesterday.strftime("%m月%d日")})你说：</p>
             <p class="card-text" style="background:#fff;padding:12px;border-radius:8px;margin:6px 0">"{y_text}"</p>
             <p class="card-text card-sub">准确度: {y_stars} | 预测{y_score}分</p>
-            <p class="card-text" style="margin-top:8px">📌 <strong>今日与昨日的关系：</strong>昨日地支「{yest_e}」→ {ny_s} → 今日地支「{today_e}」{extra}</p></div>'''
+            <p class="card-text" style="margin-top:8px">📌 昨日「{yest_e}」→ <strong>{ny_s}</strong> → 今日「{today_e}」</p>
+            <p class="card-text" style="background:#fff;padding:12px;border-radius:8px;margin:4px 0">💡 {explain_text}。{story}</p></div>'''
         
         content += f'''
         <div class="card card-highlight"><div class="card-header"><span class="card-icon">🔄</span><span class="card-title">大运 · {reading['current_dayun']['name']}</span>
@@ -596,6 +639,38 @@ class BaziHandler(BaseHTTPRequestHandler):
         for tip in h['personal_tips']:
             content += f'<p class="card-text card-sub">• {tip}</p>'
         content += '</details></div>'
+        
+        # ---- 力场分析 ----
+        try:
+            vf = force_engine.get_visual_forces(target_date)
+            bars_html = ''
+            for b in vf['bars']:
+                pct = min(100, abs(b['value']) * 8)  # 放大显示
+                bar_cls = 'force-good' if b['value'] > 0 else 'force-bad' if b['value'] < 0 else 'force-neutral'
+                val_cls = 'pos' if b['value'] > 0 else 'neg' if b['value'] < 0 else ''
+                sign = '+' if b['value'] > 0 else ''
+                bars_html += f'<div class="force-bar"><span class="force-label">{b["label"]}</span><div class="force-track"><div class="force-fill {bar_cls}" style="width:{pct}%"></div></div><span class="force-value {val_cls}">{sign}{b["value"]}</span></div>'
+            
+            # 十二长生
+            ls_html = ''
+            for ls in vf['life_stages'][:4]:  # 只显示原局四柱
+                stage_cls = 'stage-strong' if ls['power'] >= 0.7 else 'stage-weak' if ls['power'] <= 0.3 else 'stage-mid'
+                ls_html += f'<div class="life-item"><span>{ls["position"]}</span><span class="life-stage {stage_cls}">{ls["stage"]}({ls["power"]:.1f})</span></div>'
+            
+            # 交互力
+            int_html = ''
+            for it in vf['interactions'][:3]:
+                int_html += f'<p class="card-text card-sub">• {it["desc"]} ({it["force"]:+d})</p>'
+            
+            content += f'''
+            <div class="card"><div class="card-header"><span class="card-icon">⚡</span><span class="card-title">力场分析</span><span class="card-badge">{vf["total_score"]}分</span></div>
+            <p class="card-text">{vf["summary"]}</p>
+            <div style="margin:12px 0">{bars_html}</div>
+            <details><summary style="font-size:13px;color:#888;cursor:pointer">▼ 十二长生状态</summary><div class="life-grid">{ls_html}</div></details>
+            <details><summary style="font-size:13px;color:#888;cursor:pointer;margin-top:8px">▼ 地支交互力</summary><div style="margin-top:6px">{int_html}</div></details>
+            </div>'''
+        except Exception as e:
+            content += f'<!-- force error: {e} -->'
         
         content += f'''
         <div class="card"><div class="card-header"><span class="card-icon">👨‍👩‍👧</span><span class="card-title">父母 / 家庭</span></div>'''
