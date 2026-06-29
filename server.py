@@ -1075,6 +1075,7 @@ class BaziHandler(BaseHTTPRequestHandler):
                     'text': (fb.get('actual_feedback','') or '')[:120],
                     'acc': fb.get('accuracy_rating',0) or 0,
                     'act': fb.get('actual_rating',0) or 0,
+                    'ds': ds, 'db': db,
                 }
                 
                 if active_dim == 'all':
@@ -1147,9 +1148,17 @@ class BaziHandler(BaseHTTPRequestHandler):
             
             for e in sorted(g_data['entries'], key=lambda x: x['date'], reverse=True):
                 acc_s = '★'*e['acc'] + '☆'*(5-e['acc'])
+                # 用理论引擎分析
+                try:
+                    analysis = theory_engine.analyze_event(e['date'], e['text'], e['ds'], e['db'])
+                    insight = analysis['insight'][:200]
+                except:
+                    insight = ''
                 content += f'<div class="feedback-item" style="padding:10px;border-left:2px solid {"#bf8f00" if e["acc"]>=3 else "#e0e0e0"}"><div class="fb-header"><a href="/date/{e["date"]}" class="fb-date" style="font-size:13px">{e["date"]}</a><span class="tag" style="font-size:10px">{e["pillar"]}</span><span class="fb-score" style="font-size:12px">{e["score"]}分</span><span style="font-size:11px;color:#888">{acc_s}</span></div>'
                 if e['text']:
-                    content += f'<p class="fb-content" style="font-size:13px">{e["text"]}</p>'
+                    content += f'<p class="card-sub" style="font-size:12px;margin-bottom:4px">📝 你当日的经历：{e["text"]}</p>'
+                if insight:
+                    content += f'<p class="card-text" style="font-size:13px;background:#fff;padding:8px;border-radius:6px;margin:4px 0">🔍 八字之神解析：{insight}</p>'
                 content += '</div>'
             
             content += '</div></div>'
