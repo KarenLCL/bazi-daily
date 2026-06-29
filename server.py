@@ -141,6 +141,9 @@ a{text-decoration:none;color:inherit}
 .stage-strong{background:#fff8e1;color:#8d6e00}
 .stage-weak{background:#efebe9;color:#795548}
 .stage-mid{background:#f5f5f5;color:#666}
+.section-label{display:flex;align-items:center;gap:10px;margin:20px 0 12px 0}
+.section-tag{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;color:#fff;font-size:13px;font-weight:700;background:#5d4037}
+.section-label span:last-child{font-size:14px;color:#888}
 .btn{padding:10px 24px;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s}
 .btn-primary{background:#5d4037;color:#fff;width:100%}
 .btn-primary:hover{background:#4e342e}
@@ -536,6 +539,7 @@ class BaziHandler(BaseHTTPRequestHandler):
         prev_d = target_date - timedelta(days=1)
         next_d = target_date + timedelta(days=1)
         
+        # ===== ① 象 — 今日之象 =====
         content = f'''
         <div class="date-nav">
         <a href="/date/{prev_d.strftime('%Y/%m/%d')}" class="date-arrow">‹</a>
@@ -550,36 +554,90 @@ class BaziHandler(BaseHTTPRequestHandler):
         <div class="score-card" style="background:{s['color']}">
         <div class="score-circle" style="background:conic-gradient(#5d4037 {s['score']*3.6}deg,#f0f0f0 {s['score']*3.6}deg)">
         <div class="score-number">{s['score']}</div>
-        <div class="score-label">分</div></div>
+        <div class="score-label">{s['level']}</div></div>
         <div class="score-info">
-        <div class="score-level {lev_class}">{s['level']}</div>
         <div class="score-pillar">{r['daily_bazi']['day']['name']} · {r['daily_bazi']['day']['nayin']}</div>
-        <div class="score-element">天干{o['stem_element']} · 地支{o['branch_element']}</div>
+        <div class="score-element">天干{o['stem_element']} · 地支{o['branch_element']} · 十神{c['ten_god']}</div>
         </div></div>
         
-        <div class="card"><div class="card-header"><span class="card-icon">📋</span><span class="card-title">今日总览</span></div>
+        <div class="card"><div class="card-header"><span class="card-icon">📋</span><span class="card-title">今日概况</span></div>
         <p class="card-text">{o['summary']}</p>
-        <p class="card-text card-sub">{o.get('element_note','')}</p></div>'''
+        <p class="card-text card-sub">{o.get('element_note','')}</p></div>
         
-        # ---- 八字之神·理论解析 ----
+        <div class="card"><div class="card-header"><span class="card-icon">✅</span><span class="card-title">宜忌</span></div>
+        <div class="advice-col">
+        <div class="advice-good"><h4>✅ 宜</h4><ul>'''
+        for item in adv['favorable'][:5]:
+            content += f'<li>{item}</li>'
+        content += '</ul></div><div class="advice-bad"><h4>❌ 不宜</h4><ul>'
+        for item in adv['unfavorable'][:5]:
+            content += f'<li>{item}</li>'
+        content += '</ul></div></div></div>'
+        
+        # 计划
+        today_plans = get_plans_by_date(target_date.isoformat())
+        if today_plans:
+            content += '<div class="card card-highlight"><div class="card-header"><span class="card-icon">📌</span><span class="card-title">今日安排</span></div>'
+            for plan in today_plans:
+                content += f'<p class="card-text">• <strong>{plan["title"]}</strong>'
+                if plan.get('description'):
+                    content += f'：{plan["description"]}'
+                content += f' <span class="tag" style="font-size:11px">{plan.get("category","")}</span></p>'
+            content += '</div>'
+        
+        # ===== ② 数 — 今日之数 =====
+        content += f'<div class="section-label"><span class="section-tag">数</span><span>今天的八字力场和参数</span></div>'
+        
+        try:
+            vf = force_engine.get_visual_forces(target_date)
+            bars_html = ''
+            for b in vf['bars']:
+                pct = min(100, abs(b['value']) * 8)
+                bar_cls = 'force-good' if b['value'] > 0 else 'force-bad' if b['value'] < 0 else 'force-neutral'
+                val_cls = 'pos' if b['value'] > 0 else 'neg' if b['value'] < 0 else ''
+                sign = '+' if b['value'] > 0 else ''
+                bars_html += f'<div class="force-bar"><span class="force-label">{b["label"]}</span><div class="force-track"><div class="force-fill {bar_cls}" style="width:{pct}%"></div></div><span class="force-value {val_cls}">{sign}{b["value"]}</span></div>'
+            ls_html = ''
+            for ls in vf['life_stages'][:4]:
+                stage_cls = 'stage-strong' if ls['power'] >= 0.7 else 'stage-weak' if ls['power'] <= 0.3 else 'stage-mid'
+                ls_html += f'<div class="life-item"><span>{ls["position"]}</span><span class="life-stage {stage_cls}">{ls["stage"]}({ls["power"]:.1f})</span></div>'
+            int_html = ''
+            for it in vf['interactions'][:3]:
+                int_html += f'<p class="card-text card-sub">• {it["desc"]} ({it["force"]:+d})</p>'
+            content += f'''
+            <div class="card"><div class="card-header"><span class="card-icon">⚡</span><span class="card-title">力场分析</span><span class="card-badge">{vf["total_score"]}分</span></div>
+            <p class="card-text">{vf["summary"]}</p>
+            <div style="margin:12px 0">{bars_html}</div>
+            <details><summary style="font-size:13px;color:#888;cursor:pointer">▼ 十二长生</summary><div class="life-grid">{ls_html}</div></details>
+            <details><summary style="font-size:13px;color:#888;cursor:pointer;margin-top:8px">▼ 地支交互力</summary><div style="margin-top:6px">{int_html}</div></details>
+            </div>'''
+        except Exception as e:
+            content += f'<!-- force error: {e} -->'
+        
+        # ===== ③ 理 — 经典之理 =====
+        content += f'<div class="section-label"><span class="section-tag">理</span><span>经典理论如何解释今天的参数</span></div>'
+        
         try:
             td = theory_engine.get_today_theory(target_date)
             th_html = ''
             for t in td['theory'][:4]:
-                th_html += f'<p class="card-text" style="margin-bottom:6px"><strong>{t["label"]}</strong><br><span class="card-sub">{t["content"]}</span><br>{t["apply"]}</p>'
+                th_html += f'<p class="card-text" style="margin-bottom:10px"><strong>{t["label"]}</strong><br><span class="card-sub">{t["content"]}</span><br><span style="font-size:14px">{t["apply"]}</span></p>'
             pe_html = ''
             for ex in td['past_examples'][:2]:
                 pe_html += f'<p class="card-text card-sub">• {ex}</p>'
+            det = ''
+            if pe_html:
+                det = '<details><summary style="font-size:13px;color:#888;cursor:pointer">▼ 往期同类日参考</summary>' + pe_html + '</details>'
             content += f'''
             <div class="card" style="background:#f5f0eb">
-            <div class="card-header"><span class="card-icon">📜</span><span class="card-title">八字之神·{td["pillar"]}理数解析</span></div>
+            <div class="card-header"><span class="card-icon">📜</span><span class="card-title">{td["pillar"]}理数解析</span></div>
             {th_html}
-            {"<details><summary style=\'font-size:13px;color:#888;cursor:pointer\'>▼ 往期同类日参考</summary>" + pe_html + "</details>" if pe_html else ""}
+            {det}
             </div>'''
         except Exception as e:
             content += f'<!-- theory error: {e} -->'
         
-        # ---- 八字之神·昨日回顾 ----
+        # 昨日回顾
         yesterday = target_date - timedelta(days=1)
         y_fb = get_feedback_by_date(yesterday.isoformat())
         if y_fb and y_fb.get('actual_feedback'):
@@ -593,54 +651,46 @@ class BaziHandler(BaseHTTPRequestHandler):
             ny_s = '、'.join(ny_rel) if ny_rel else '平'
             today_e = EARTHLY_BRANCHES[db]
             yest_e = EARTHLY_BRANCHES[y_branch]
-            
-            # ---- 八字关系讲解 ----
-            rel_meaning = {
-                '合': '能量汇聚或外泄，容易与人合作或被事情牵住',
-                '冲': '能量对冲，易有突发变化或情绪波动',
-                '刑': '能量纠结，易有小摩擦或思虑过多',
-                '害': '能量暗耗，看似平顺实则有些事不太顺心',
-                '三合': '能量共振，适合协作和推进',
-                '自刑': '自我纠结，容易想太多',
-                '平': '能量平稳过渡',
-            }
-            # 组合讲解
-            explanations = []
-            for r in ny_rel:
-                explanations.append(rel_meaning.get(r, f'{r}关系'))
-            explain_text = '；'.join(explanations) if explanations else '能量平稳过渡'
-            
-            # 今日→昨日关系故事
+            rel_m = {'合':'汇聚','冲':'对冲','刑':'纠结','害':'暗耗','三合':'共振','自刑':'内耗'}
+            expl = [rel_m.get(r,r) for r in (ny_rel or ['平'])]
+            explain = '→'.join(expl)
             story = ''
-            if y_branch == 9 and db == 10:  # 酉→戌 害
-                story = '昨天是你的禄神日（酉金），能量充沛。今天转戌土，酉戌相害，昨天的好状态不会直接延续——不要因为昨天状态好就今天硬撑，适当调整节奏。'
-            elif y_branch == 8 and db == 5:  # 申→巳 合
-                story = '昨天申日与你的日支巳相合，有没有感觉能量被合走？今天巳日，合的力量还在延续，继续注意不要过度消耗。'
-            elif y_branch == 6 and db == 0:  # 午→子 冲
-                story = '昨天午火日，今天子水日，午子相冲，能量两极反转。情绪上可能有起伏，注意稳住。'
-            elif db == 9:  # 今天是酉日
-                story = '今天是你的禄神日（酉金）！昨天不管状态如何，今天都会感觉能量回升。把握今天推进重要事项。'
-            
+            if y_branch == 9 and db == 10:
+                story = '昨天禄神日，今天转戌相害，不要因为昨天状态好就硬撑。'
+            elif db == 9:
+                story = '今天是你的禄神日！能量回升。'
             content += f'''
             <div class="card" style="background:#f5f0eb">
-            <div class="card-header"><span class="card-icon">📖</span><span class="card-title">八字之神·昨日回顾</span></div>
-            <p class="card-text card-sub">昨日({yesterday.strftime("%m月%d日")})你说：</p>
-            <p class="card-text" style="background:#fff;padding:12px;border-radius:8px;margin:6px 0">"{y_text}"</p>
+            <div class="card-header"><span class="card-icon">📖</span><span class="card-title">印证·昨日回顾</span></div>
+            <p class="card-text card-sub">昨日({yesterday.strftime("%m月%d日")})「{y_text}」</p>
             <p class="card-text card-sub">准确度: {y_stars} | 预测{y_score}分</p>
-            <p class="card-text" style="margin-top:8px">📌 昨日「{yest_e}」→ <strong>{ny_s}</strong> → 今日「{today_e}」</p>
-            <p class="card-text" style="background:#fff;padding:12px;border-radius:8px;margin:4px 0">💡 {explain_text}。{story}</p></div>'''
+            <p class="card-text" style="margin-top:6px">📌 昨日地支「{yest_e}」→ {ny_s} → 今日地支「{today_e}」：{explain}</p>
+            <p class="card-text" style="background:#fff;padding:12px;border-radius:8px;margin:4px 0">💡 {story}</p></div>'''
+        
+        # 智慧库
+        try:
+            wisdom_engine.refresh_wisdom()
+            tw = wisdom_engine.get_wisdom_for_today(target_date)
+            if tw.get('matches'):
+                content += f'<div class="card" style="background:#f5f0eb"><div class="card-header"><span class="card-icon">🧠</span><span class="card-title">智慧库</span><span class="card-badge">{tw["total_feedback_days"]}天</span></div>'
+                for m in tw['matches']:
+                    content += f'<p class="card-text" style="margin-bottom:6px">• {m["wisdom"]}</p>'
+                content += '</div>'
+        except Exception:
+            pass
+        
+        # ===== ④ 体 — 各领域 =====
+        content += f'<div class="section-label"><span class="section-tag">体</span><span>各领域的当天表现</span></div>'
         
         content += f'''
         <div class="card card-highlight"><div class="card-header"><span class="card-icon">🔄</span><span class="card-title">大运 · {reading['current_dayun']['name']}</span>
         <span class="card-badge">{reading['current_dayun']['age']}岁</span></div>
         <p class="card-text">{c['dayun_effect']}</p></div>
         
-        <div class="card"><div class="card-header"><span class="card-icon">💼</span><span class="card-title">事业财运</span></div>
+        <div class="card"><div class="card-header"><span class="card-icon">💼</span><span class="card-title">事业</span></div>
         <p class="card-text">{c['ten_god_reading']}</p>'''
-        
         for effect in c.get('branch_effects', []):
             content += f'<p class="card-text card-sub" style="color:#e65100">⚠ {effect}</p>'
-        
         content += f'''
         <div class="tag-row">
         <span class="tag {"tag-good" if c["is_favorable_day"] else "tag-bad"}">{"✅ 用神日" if c["is_favorable_day"] else "⚠ 忌神日"}</span>
@@ -651,132 +701,67 @@ class BaziHandler(BaseHTTPRequestHandler):
         <p class="card-text">{rel['ten_god_reading']}</p>
         <p class="card-text card-sub">{rel['gu_chen_tip']}</p></div>
         
-        <div class="card"><div class="card-header"><span class="card-icon">🏥</span><span class="card-title">健康提示</span></div>'''
+        <div class="card"><div class="card-header"><span class="card-icon">🏥</span><span class="card-title">健康</span></div>'''
         for tip in h['tips']:
             content += f'<p class="card-text">• {tip}</p>'
-        content += '<details class="card-details"><summary>个人体质提示</summary>'
+        content += '<details class="card-details"><summary style="font-size:13px;color:#888;cursor:pointer">▼ 个人体质说明</summary>'
         for tip in h['personal_tips']:
             content += f'<p class="card-text card-sub">• {tip}</p>'
         content += '</details></div>'
         
-        # ---- 力场分析 ----
-        try:
-            vf = force_engine.get_visual_forces(target_date)
-            bars_html = ''
-            for b in vf['bars']:
-                pct = min(100, abs(b['value']) * 8)  # 放大显示
-                bar_cls = 'force-good' if b['value'] > 0 else 'force-bad' if b['value'] < 0 else 'force-neutral'
-                val_cls = 'pos' if b['value'] > 0 else 'neg' if b['value'] < 0 else ''
-                sign = '+' if b['value'] > 0 else ''
-                bars_html += f'<div class="force-bar"><span class="force-label">{b["label"]}</span><div class="force-track"><div class="force-fill {bar_cls}" style="width:{pct}%"></div></div><span class="force-value {val_cls}">{sign}{b["value"]}</span></div>'
-            
-            # 十二长生
-            ls_html = ''
-            for ls in vf['life_stages'][:4]:  # 只显示原局四柱
-                stage_cls = 'stage-strong' if ls['power'] >= 0.7 else 'stage-weak' if ls['power'] <= 0.3 else 'stage-mid'
-                ls_html += f'<div class="life-item"><span>{ls["position"]}</span><span class="life-stage {stage_cls}">{ls["stage"]}({ls["power"]:.1f})</span></div>'
-            
-            # 交互力
-            int_html = ''
-            for it in vf['interactions'][:3]:
-                int_html += f'<p class="card-text card-sub">• {it["desc"]} ({it["force"]:+d})</p>'
-            
-            content += f'''
-            <div class="card"><div class="card-header"><span class="card-icon">⚡</span><span class="card-title">力场分析</span><span class="card-badge">{vf["total_score"]}分</span></div>
-            <p class="card-text">{vf["summary"]}</p>
-            <div style="margin:12px 0">{bars_html}</div>
-            <details><summary style="font-size:13px;color:#888;cursor:pointer">▼ 十二长生状态</summary><div class="life-grid">{ls_html}</div></details>
-            <details><summary style="font-size:13px;color:#888;cursor:pointer;margin-top:8px">▼ 地支交互力</summary><div style="margin-top:6px">{int_html}</div></details>
-            </div>'''
-        except Exception as e:
-            content += f'<!-- force error: {e} -->'
-        
         content += f'''
-        <div class="card"><div class="card-header"><span class="card-icon">👨‍👩‍👧</span><span class="card-title">父母 / 家庭</span></div>'''
+        <div class="card"><div class="card-header"><span class="card-icon">👨‍👩‍👧</span><span class="card-title">家庭</span></div>'''
         for note in fam['notes']:
             content += f'<p class="card-text">• {note}</p>'
+        content += '</div>'
         
-        # ---- 今日计划 ----
-        today_plans = get_plans_by_date(target_date.isoformat())
-        if today_plans:
-            content += '<div class="card card-highlight"><div class="card-header"><span class="card-icon">📌</span><span class="card-title">今日安排</span></div>'
-            for plan in today_plans:
-                content += f'<p class="card-text">• <strong>{plan["title"]}</strong>'
-                if plan.get('description'):
-                    content += f'：{plan["description"]}'
-                content += f' <span class="tag" style="font-size:11px">{plan.get("category","")}</span></p>'
-            content += '</div>'
+        # ===== ⑤ 用 — 今日之用 =====
+        content += f'<div class="section-label"><span class="section-tag">用</span><span>今天你该怎么做</span></div>'
         
         content += f'''
-        <div class="card"><div class="card-header"><span class="card-icon">✅</span><span class="card-title">今日宜忌</span></div>
-        <div class="advice-col">
-        <div class="advice-good"><h4>✅ 宜</h4><ul>'''
-        for item in adv['favorable'][:5]:
-            content += f'<li>{item}</li>'
-        content += '</ul></div><div class="advice-bad"><h4>❌ 不宜</h4><ul>'
-        for item in adv['unfavorable'][:5]:
-            content += f'<li>{item}</li>'
-        content += '</ul></div></div></div>'
-        
-        # ---- 八字之神·智慧提醒 ----
-        try:
-            wisdom_engine.refresh_wisdom()
-            today_wisdom = wisdom_engine.get_wisdom_for_today(target_date)
-            if today_wisdom.get('matches'):
-                content += '<div class="card card-highlight"><div class="card-header"><span class="card-icon">🧠</span><span class="card-title">八字之神·智慧库</span><span class="card-badge">基于{}天反馈</span></div>'.format(today_wisdom['total_feedback_days'])
-                for m in today_wisdom['matches']:
-                    content += f'<p class="card-text" style="margin-bottom:8px">• {m["wisdom"]}</p>'
-                content += '</div>'
-        except Exception:
-            pass
-        
-        content += f'''
-        <div class="card card-reminder"><div class="card-header"><span class="card-icon">🔔</span><span class="card-title">专属提醒</span></div>'''
+        <div class="card card-reminder"><div class="card-header"><span class="card-icon">🔔</span><span class="card-title">提醒</span></div>'''
         for reminder in rem:
             content += f'<p class="card-text">• {reminder}</p>'
         content += '</div>'
         
         content += f'''
-        <div class="card"><div class="card-header"><span class="card-icon">🌅</span><span class="card-title">晨起 · 辰时 (7-9点)</span></div>
+        <div class="card"><div class="card-header"><span class="card-icon">🌅</span><span class="card-title">辰时 (7-9点)</span></div>
         <p class="card-text">{hr["description"]}</p>
         <p class="card-text card-sub">{hr["ten_god_reading"]}</p></div>
         
-        <div class="card card-feedback" id="feedback-section">
-        <div class="card-header"><span class="card-icon">📝</span><span class="card-title">今日反馈</span></div>'''
+        <div class="card card-feedback">
+        <div class="card-header"><span class="card-icon">📝</span><span class="card-title">记录今日之象</span></div>'''
         
         if fb:
-            content += f'<div class="feedback-exists"><p>✅ 已记录今日反馈</p>'
-            if fb.get('actual_feedback'):
-                fb_text = fb['actual_feedback'][:100]
-                content += f'<p class="card-sub">你写的: {fb_text}{"..." if len(fb["actual_feedback"])>100 else ""}</p>'
-            content += f'<button onclick="var f=document.getElementById(\'feedback-form\');if(f)f.classList.remove(\'hidden\');" class="btn btn-sm">✏️ 修改</button></div>'
+            fb_show = (fb.get('actual_feedback') or '')[:150]
+            content += f'<div class="feedback-exists"><p>✅ 今日已记录</p>'
+            if fb_show:
+                content += f'<p class="card-sub">你写了: {fb_show}{"…" if len(fb.get("actual_feedback","") or "")>150 else ""}</p>'
+            content += f'<button onclick="editFeedback()" class="btn btn-sm">✏️ 修改</button></div>'
         
         content += f'''
         <form id="feedback-form" method="post" class="{"hidden" if fb else ""}" onsubmit="return submitFeedback(event)">
         <input type="hidden" name="date" value="{target_date.isoformat()}">
         <input type="hidden" name="prediction_score" value="{s["score"]}">
         <input type="hidden" name="prediction_level" value="{s["level"]}">
-        <textarea name="actual_feedback" rows="3" placeholder="今天过得怎么样？记录一下今天实际发生的事…" class="feedback-input"></textarea>
+        <textarea name="actual_feedback" rows="3" placeholder="今天发生了什么？写下来充实你的命理注疏…" class="feedback-input"></textarea>
         <div class="feedback-ratings">
-        <div class="rating-group"><label>今天整体感受</label>
+        <div class="rating-group"><label>感受</label>
         <div class="stars" data-name="actual_rating">
         <span class="star" data-value="1" onclick="setRating(this)">☆</span>
         <span class="star" data-value="2" onclick="setRating(this)">☆</span>
         <span class="star" data-value="3" onclick="setRating(this)">☆</span>
         <span class="star" data-value="4" onclick="setRating(this)">☆</span>
         <span class="star" data-value="5" onclick="setRating(this)">☆</span>
-        </div><span class="star-hint">轻点星星评分</span></div>
-        <div class="rating-group"><label>预测准确度</label>
+        </div></div>
+        <div class="rating-group"><label>准度</label>
         <div class="stars" data-name="accuracy_rating">
         <span class="star" data-value="1" onclick="setRating(this)">☆</span>
         <span class="star" data-value="2" onclick="setRating(this)">☆</span>
         <span class="star" data-value="3" onclick="setRating(this)">☆</span>
         <span class="star" data-value="4" onclick="setRating(this)">☆</span>
         <span class="star" data-value="5" onclick="setRating(this)">☆</span>
-        </div><span class="star-hint">轻点星星评分</span></div></div>
-        <button type="submit" class="btn btn-primary">提交反馈</button>
         </form></div>'''
-        
         self._send_html(self._page(content, 'home'))
     
     # ============================================================
