@@ -1009,16 +1009,22 @@ class BaziHandler(BaseHTTPRequestHandler):
         self._send_html(self._page(content, 'diary'))
     
     # ============================================================
-    #  历史记录
+    #  记录页（按八字维度重组）
     # ============================================================
     
     def _serve_history(self):
-        feedbacks = get_recent_feedback(90)
+        feedbacks = get_recent_feedback(365)
         stats = get_feedback_accuracy_stats()
         
+        # 获取维度参数
+        import urllib.parse as up
+        parsed = up.urlparse(self.path)
+        params = up.parse_qs(parsed.query)
+        active_dim = params.get('dim', ['all'])[0]
+        
         content = f'''
-        <h2 class="page-title">📊 反馈记录</h2>
-        <p class="page-subtitle">你的反馈越多，我的预测越准</p>
+        <h2 class="page-title">📊 命理注疏</h2>
+        <p class="page-subtitle">按八字维度整理你的每日反馈，一本会生长的命理笔记</p>
         
         <div class="stats-row">
         <div class="stat-card"><div class="stat-number">{stats["total"]}</div><div class="stat-label">累计反馈</div></div>
@@ -1026,46 +1032,127 @@ class BaziHandler(BaseHTTPRequestHandler):
         <div class="stat-card"><div class="stat-number">{stats["avg_actual"]}</div><div class="stat-label">平均感受</div></div>
         </div>
         
-        <div class="card"><div class="card-header"><span class="card-icon">📋</span><span class="card-title">反馈历史</span></div>'''
+        <div class="dim-tabs" style="display:flex;gap:4px;overflow-x:auto;margin-bottom:12px;padding:4px 0">'''
         
-        if feedbacks:
-            content += '<div class="feedback-list">'
-            for fb in feedbacks:
-                # 获取当日干支和关系
-                try:
-                    d = date.fromisoformat(fb['date'])
-                    ds, db = get_day_stem_branch(d)
-                    pillar = get_bazi_pillar_name(ds, db)
-                    birth_db = BIRTH_CHART["day"]["branch"]
-                    relations = get_branch_relation(db, birth_db)
-                    rel_str = ' '.join(relations) if relations else '平'
-                except:
-                    pillar = '--'
-                    rel_str = '--'
-                
-                lev_bg = '#fff8e1' if fb.get('prediction_level') in ['大吉','吉'] else '#efebe9'
-                content += f'<div class="feedback-item" style="border-left:3px solid {"#bf8f00" if fb.get("accuracy_rating") and fb.get("accuracy_rating",0)>=3 else "#e0e0e0"}"><div class="fb-header"><a href="/date/{fb["date"]}" class="fb-date">{fb["date"]}</a><span class="tag">{pillar}</span><span class="tag" style="background:{lev_bg};font-size:11px">{rel_str}</span><span class="fb-score">{fb.get("prediction_score","")}分</span></div>'
-                if fb.get('actual_feedback'):
-                    content += f'<p class="fb-content">{fb["actual_feedback"][:200]}{"…" if len(fb["actual_feedback"])>200 else ""}</p>'
-                content += '<div class="fb-ratings">'
-                if fb.get('actual_rating'):
-                    content += f'<span>感受: {"★"*fb["actual_rating"]}{"☆"*(5-fb["actual_rating"])}</span>'
-                if fb.get('accuracy_rating'):
-                    content += f'<span>准确度: {"★"*fb["accuracy_rating"]}{"☆"*(5-fb["accuracy_rating"])}</span>'
-                content += '</div></div>'
-            content += '</div>'
-        else:
-            content += '<p class="card-text card-sub">还没有反馈记录。每天看完运势后，记得回来反馈一下哦！</p>'
-        
+        dims = [
+            ('all', '📋 全部'),
+            ('ten_god', '🔤 十神'),
+            ('branch', '🌿 地支'),
+            ('life_stage', '🌱 长生'),
+            ('season', '☀️ 季节'),
+        ]
+        for key, label in dims:
+            act = ' style="background:#5d4037;color:#fff;font-weight:600"' if key == active_dim else ''
+            content += f'<a href="/history?dim={key}" class="nav-item"{act}>{label}</a>'
         content += '</div>'
-        content += '''
-        <div class="card card-reminder"><div class="card-header"><span class="card-icon">💡</span><span class="card-title">使用流程</span></div>
-        <ol style="padding-left:20px">
-        <li style="font-size:14px;color:#555;margin-bottom:8px">🌅 早上打开「今日」页面看运势</li>
-        <li style="font-size:14px;color:#555;margin-bottom:8px">📝 晚上在「日记」页面记录今天发生的事</li>
-        <li style="font-size:14px;color:#555;margin-bottom:8px">⭐ 在运势页面反馈「今天的预测准不准」</li>
-        <li style="font-size:14px;color:#555;margin-bottom:8px">📊 反馈越多，算法校准越精准</li>
-        </ol></div>'''
+        
+        if not feedbacks:
+            content += '<p class="card-text card-sub" style="text-align:center;padding:40px">还没有反馈记录，看完流日后记得提交反馈哦</p>'
+            self._send_html(self._page(content, 'history'))
+            return
+        
+        # 对反馈按请求维度分组
+        groups = {}
+        for fb in feedbacks:
+            try:
+                d = date.fromisoformat(fb['date'])
+                ds, db = get_day_stem_branch(d)
+                pillar = get_bazi_pillar_name(ds, db)
+                ten_god = get_ten_god(BIRTH_CHART["day"]["stem"], ds)
+                relations = get_branch_relation(db, BIRTH_CHART["day"]["branch"])
+                rel_str = '、'.join(relations) if relations else '平'
+                stage = get_life_stage(BIRTH_CHART["day"]["stem"], db)[1]
+                month = d.month
+                if 3 <= month <= 5: season = "春季"
+                elif 6 <= month <= 8: season = "夏季"
+                elif 9 <= month <= 11: season = "秋季"
+                else: season = "冬季"
+                
+                entry = {
+                    'date': fb['date'], 'pillar': pillar, 'ten_god': ten_god,
+                    'rel': rel_str, 'stage': stage, 'season': season,
+                    'score': fb.get('prediction_score',''), 'level': fb.get('prediction_level',''),
+                    'text': (fb.get('actual_feedback','') or '')[:120],
+                    'acc': fb.get('accuracy_rating',0) or 0,
+                    'act': fb.get('actual_rating',0) or 0,
+                }
+                
+                if active_dim == 'all':
+                    key = pillar
+                elif active_dim == 'ten_god':
+                    key = ten_god
+                elif active_dim == 'branch':
+                    key = rel_str
+                elif active_dim == 'life_stage':
+                    key = stage
+                elif active_dim == 'season':
+                    key = season
+                else:
+                    key = pillar
+                
+                if key not in groups:
+                    groups[key] = {'entries': [], 'count': 0, 'total_acc': 0, 'total_act': 0}
+                groups[key]['entries'].append(entry)
+                groups[key]['count'] += 1
+                groups[key]['total_acc'] += entry['acc']
+                groups[key]['total_act'] += entry['act']
+            except:
+                continue
+        
+        # 排序：条目多的组在前
+        sorted_groups = sorted(groups.items(), key=lambda x: -x[1]['count'])
+        
+        for g_key, g_data in sorted_groups:
+            avg_acc = round(g_data['total_acc'] / g_data['count'], 1) if g_data['count'] else 0
+            avg_act = round(g_data['total_act'] / g_data['count'], 1) if g_data['count'] else 0
+            
+            # 根据维度生成智慧总结
+            wisdom = ''
+            if active_dim == 'ten_god':
+                tg_theory = {
+                    '正官':'按规则办事日', '七杀':'压力挑战日', '正印':'学习充电日',
+                    '偏印':'灵感创意日', '比肩':'团队协作日', '劫财':'社交活跃日',
+                    '食神':'表达享受日', '伤官':'言辞犀利日', '正财':'财务规划日',
+                    '偏财':'机遇风险日',
+                }
+                wisdom = tg_theory.get(g_key, '')
+            elif active_dim == 'branch':
+                br_theory = {
+                    '合':'能量汇聚或外泄', '冲':'能量对冲波动', '刑':'能量纠结摩擦',
+                    '害':'能量暗耗', '三合':'能量共振', '平':'能量平稳',
+                }
+                wisdom_parts = [br_theory.get(r.strip(), '') for r in g_key.replace('、','、').split('、')]
+                wisdom = '、'.join([p for p in wisdom_parts if p])
+            elif active_dim == 'life_stage':
+                ls_theory = {
+                    '长生':'初生养气','沐浴':'生机待稳','冠带':'渐成气候',
+                    '临官':'正当其时','帝旺':'顶峰将衰','衰':'收束不扩',
+                    '病':'休养生息','死':'旧去新来','墓':'沉淀收藏',
+                    '绝':'绝处逢生','胎':'酝酿之中','养':'蓄势待发',
+                }
+                wisdom = ls_theory.get(g_key, '')
+            elif active_dim == 'season':
+                wisdom = {'春季':'木旺宜土金','夏季':'火旺宜降火','秋季':'金旺好季节','冬季':'水旺宜保暖'}.get(g_key, '')
+            
+            stars = '★'*int(avg_acc) + '☆'*(5-int(avg_acc)) if avg_acc else ''
+            bg = '#fff8e1' if avg_acc >= 4.0 else '#f5f0eb'
+            content += f'''
+            <div class="card" style="background:{bg};border-left:3px solid {"#bf8f00" if avg_acc>=4.0 else "#e0e0e0"}">
+            <div class="card-header"><span class="card-icon">{'📌' if avg_acc>=4.0 else '📎'}</span>
+            <span class="card-title">{g_key}</span>
+            <span class="card-badge">{g_data["count"]}次 准确{stars}</span>
+            </div>
+            {f'<p class="card-text card-sub" style="margin-bottom:8px">{wisdom}</p>' if wisdom else ''}
+            <div class="feedback-list" style="gap:6px">'''
+            
+            for e in sorted(g_data['entries'], key=lambda x: x['date'], reverse=True):
+                acc_s = '★'*e['acc'] + '☆'*(5-e['acc'])
+                content += f'<div class="feedback-item" style="padding:10px;border-left:2px solid {"#bf8f00" if e["acc"]>=3 else "#e0e0e0"}"><div class="fb-header"><a href="/date/{e["date"]}" class="fb-date" style="font-size:13px">{e["date"]}</a><span class="tag" style="font-size:10px">{e["pillar"]}</span><span class="fb-score" style="font-size:12px">{e["score"]}分</span><span style="font-size:11px;color:#888">{acc_s}</span></div>'
+                if e['text']:
+                    content += f'<p class="fb-content" style="font-size:13px">{e["text"]}</p>'
+                content += '</div>'
+            
+            content += '</div></div>'
         
         self._send_html(self._page(content, 'history'))
     
