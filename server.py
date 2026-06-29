@@ -31,6 +31,7 @@ from plans_module import (
     add_plan, get_plans_by_date, get_upcoming_plans,
     get_recent_plans, delete_plan,
 )
+from wisdom_engine import wisdom_engine
 
 interpreter = PersonalizedInterpreter()
 HOST = '0.0.0.0'
@@ -623,6 +624,18 @@ class BaziHandler(BaseHTTPRequestHandler):
             content += f'<li>{item}</li>'
         content += '</ul></div></div></div>'
         
+        # ---- 八字之神·智慧提醒 ----
+        try:
+            wisdom_engine.refresh_wisdom()
+            today_wisdom = wisdom_engine.get_wisdom_for_today(target_date)
+            if today_wisdom.get('matches'):
+                content += '<div class="card card-highlight"><div class="card-header"><span class="card-icon">🧠</span><span class="card-title">八字之神·智慧库</span><span class="card-badge">基于{}天反馈</span></div>'.format(today_wisdom['total_feedback_days'])
+                for m in today_wisdom['matches']:
+                    content += f'<p class="card-text" style="margin-bottom:8px">• {m["wisdom"]}</p>'
+                content += '</div>'
+        except Exception:
+            pass
+        
         content += f'''
         <div class="card card-reminder"><div class="card-header"><span class="card-icon">🔔</span><span class="card-title">专属提醒</span></div>'''
         for reminder in rem:
@@ -1083,6 +1096,18 @@ class BaziHandler(BaseHTTPRequestHandler):
             <p class="card-text">{det["love"]}</p></div>
             <div class="card"><div class="card-header"><span class="card-icon">👨‍👩‍👧</span><span class="card-title">八字之神·家庭提醒</span></div>
             <p class="card-text">{det["family"]}</p></div>'''
+        
+        # ---- 智慧总结 ----
+        try:
+            ws = wisdom_engine.get_wisdom_summary()
+            if ws.get('top_patterns'):
+                content += '<div class="card card-highlight"><div class="card-header"><span class="card-icon">🧠</span><span class="card-title">八字之神·智慧库</span><span class="card-badge">{}条规律</span></div>'.format(ws['total_patterns'])
+                content += f'<p class="card-text card-sub">基于{ws["total_days"]}天反馈数据积累</p>'
+                for p in ws['top_patterns'][:5]:
+                    content += f'<p class="card-text" style="margin-bottom:6px">📌 {p["wisdom"]}</p>'
+                content += '</div>'
+        except Exception:
+            pass
         
         self._send_html(self._page(content, 'report'))
 # ============================================================
