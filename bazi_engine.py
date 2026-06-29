@@ -354,9 +354,11 @@ def get_five_element_from_stem(stem: int) -> str:
 
 def calculate_daily_score(day_stem: int, day_branch: int, 
                           birth_stem: int, birth_branch: int,
-                          user_profile: Dict) -> Dict:
+                          user_profile: Dict,
+                          dayun_weight: int = 0) -> Dict:
     """计算每日运势评分和详细解读
     与用户的出生日柱进行比较分析
+    dayun_weight: 大运加权值 (乙酉运+15, 丙戌运+5, 丁亥运-10等)
     """
     result = {
         "score": 50,  # 0-100
@@ -484,7 +486,12 @@ def calculate_daily_score(day_stem: int, day_branch: int,
         })
     
     # 限制评分范围
-    result["score"] = max(0, min(100, score))
+    score = max(0, min(100, score))
+    
+    # 大运加权
+    score += dayun_weight
+    score = max(0, min(100, score))
+    result["score"] = score
     
     # 等级 (配色使用喜用神土金色系)
     if result["score"] >= 80:

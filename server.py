@@ -187,11 +187,10 @@ a{text-decoration:none;color:inherit}
 <div class="top-nav"><div class="nav-inner">
 <a href="/" class="nav-logo">🌟 命理</a>
 <div class="nav-links">
-<a href="/" class="nav-item NAV_HOME">今日</a>
-<a href="/monthly" class="nav-item NAV_MONTHLY">本月</a>
-<a href="/yearly" class="nav-item NAV_YEARLY">本年</a>
+<a href="/" class="nav-item NAV_HOME">流日</a>
+<a href="/monthly" class="nav-item NAV_MONTHLY">流月</a>
+<a href="/yearly" class="nav-item NAV_YEARLY">流年</a>
 <a href="/report" class="nav-item NAV_REPORT">报告</a>
-<a href="/diary" class="nav-item NAV_DIARY">日记</a>
 <a href="/history" class="nav-item NAV_HISTORY">记录</a>
 </div></div></div>
 <main class="container">
@@ -485,7 +484,7 @@ class BaziHandler(BaseHTTPRequestHandler):
         self.wfile.write(str(text).encode('utf-8'))
     
     def _page(self, content, active_nav=''):
-        nav_class = {'home':'','monthly':'','yearly':'','report':'','diary':'','history':''}
+        nav_class = {'home':'','monthly':'','yearly':'','report':'','history':''}
         if active_nav in nav_class:
             nav_class[active_nav] = 'active'
         html = HTML_HEAD

@@ -17,6 +17,7 @@ from bazi_engine import (
     calculate_daily_score, compare_with_birth_chart
 )
 from user_profile import PROFILE, BIRTH_CHART, get_current_dayun
+from dayun_weights import get_dayun_weight
 
 
 # ============ 个性化解读模板 ============
@@ -35,6 +36,7 @@ class PersonalizedInterpreter:
         
         # 计算当日八字 (辰时 8:00)
         daily_bazi = calculate_daily_bazi(target_date, 8, 0)
+        current_dayun = get_current_dayun(target_date)
         
         # 计算评分
         day_stem = daily_bazi["day"]["stem"]
@@ -45,7 +47,8 @@ class PersonalizedInterpreter:
         score_result = calculate_daily_score(
             day_stem, day_branch,
             birth_day_stem, birth_day_branch,
-            self.profile
+            self.profile,
+            dayun_weight=get_dayun_weight(current_dayun['name'])
         )
         
         # 与八字全面比较
@@ -562,7 +565,8 @@ class PersonalizedInterpreter:
         current_dayun = get_current_dayun(first_day)
         
         # 当月关键日期
-        key_dates = self._find_key_dates(year, month)
+        key_dates = self._find_key_dates(year, month, current_dayun)
+        
         
         # ---- 分项详细解读 ----
         details = self._generate_monthly_details(year, month, month_stem, month_branch, month_pillar, avg_score, current_dayun)
@@ -712,9 +716,11 @@ class PersonalizedInterpreter:
         
         return advice_list
     
-    def _find_key_dates(self, year: int, month: int) -> List[Dict]:
+    def _find_key_dates(self, year: int, month: int, current_dayun: Dict = None) -> List[Dict]:
         """找到当月关键日期（高分日/低分日）"""
         from calendar import monthrange
+        
+        dayun_weight = get_dayun_weight(current_dayun['name']) if current_dayun else 0
         
         num_days = monthrange(year, month)[1]
         scored_days = []
@@ -725,7 +731,7 @@ class PersonalizedInterpreter:
             birth_ds = self.birth_chart["day"]["stem"]
             birth_db = self.birth_chart["day"]["branch"]
             
-            sr = calculate_daily_score(ds, db, birth_ds, birth_db, self.profile)
+            sr = calculate_daily_score(ds, db, birth_ds, birth_db, self.profile, dayun_weight=dayun_weight)
             scored_days.append({
                 "date": d,
                 "score": sr["score"],
