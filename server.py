@@ -32,6 +32,7 @@ from plans_module import (
     get_recent_plans, delete_plan,
 )
 from wisdom_engine import wisdom_engine
+from theory_engine import theory_engine
 from force_engine import force_engine, LIFE_STAGE_NAMES, get_life_stage
 
 interpreter = PersonalizedInterpreter()
@@ -559,6 +560,24 @@ class BaziHandler(BaseHTTPRequestHandler):
         <div class="card"><div class="card-header"><span class="card-icon">📋</span><span class="card-title">今日总览</span></div>
         <p class="card-text">{o['summary']}</p>
         <p class="card-text card-sub">{o.get('element_note','')}</p></div>'''
+        
+        # ---- 八字之神·理论解析 ----
+        try:
+            td = theory_engine.get_today_theory(target_date)
+            th_html = ''
+            for t in td['theory'][:4]:
+                th_html += f'<p class="card-text" style="margin-bottom:6px"><strong>{t["label"]}</strong><br><span class="card-sub">{t["content"]}</span><br>{t["apply"]}</p>'
+            pe_html = ''
+            for ex in td['past_examples'][:2]:
+                pe_html += f'<p class="card-text card-sub">• {ex}</p>'
+            content += f'''
+            <div class="card" style="background:#f5f0eb">
+            <div class="card-header"><span class="card-icon">📜</span><span class="card-title">八字之神·{td["pillar"]}理数解析</span></div>
+            {th_html}
+            {"<details><summary style=\'font-size:13px;color:#888;cursor:pointer\'>▼ 往期同类日参考</summary>" + pe_html + "</details>" if pe_html else ""}
+            </div>'''
+        except Exception as e:
+            content += f'<!-- theory error: {e} -->'
         
         # ---- 八字之神·昨日回顾 ----
         yesterday = target_date - timedelta(days=1)
