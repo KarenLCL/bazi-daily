@@ -1150,7 +1150,7 @@ class BaziHandler(BaseHTTPRequestHandler):
                 acc_s = '★'*e['acc'] + '☆'*(5-e['acc'])
                 # 用理论引擎分析
                 try:
-                    analysis = theory_engine.analyze_event(e['date'], e['text'], e['ds'], e['db'])
+                    analysis = theory_engine.analyze_event(e['date'], e['text'], e['ds'], e['db'], dimension=active_dim)
                     insight = analysis['insight'][:200]
                 except:
                     insight = ''

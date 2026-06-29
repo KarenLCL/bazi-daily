@@ -496,41 +496,48 @@ class PersonalizedInterpreter:
         return reminders
     
     def _generate_hour_reading(self, daily_bazi) -> Dict:
-        """生成辰时(8:00)特别解读"""
+        """生成辰时(8:00)特别解读 - 根据当天五行动态调整"""
         hour_stem = daily_bazi["hour"]["stem"]
         hour_branch = daily_bazi["hour"]["branch"]
+        day_stem = daily_bazi["day"]["stem"]
+        day_branch = daily_bazi["day"]["branch"]
         
         hour_name = daily_bazi["hour"]["name"]
         stem_elem = get_five_element_from_stem(hour_stem)
         
-        # 辰时解读
-        hour_readings = {
-            "辰": "辰时(7-9点)·龙时：一天中阳气最旺盛的时段之一。此时做重要决策或开启新任务，容易事半功倍。",
-        }
-        
-        # 时干十神
         birth_day_stem = self.birth_chart["day"]["stem"]
         hour_ten_god = get_ten_god(birth_day_stem, hour_stem)
+        day_ten_god = get_ten_god(birth_day_stem, day_stem)
         
-        ten_god_reading = {
-            "正官": "今早气场偏正式和规矩。适合先处理邮件和计划性事务。",
-            "七杀": "今早可能有些紧迫感。深呼吸，按优先级做事，别被压力带偏。",
-            "正印": "今早学习效率高。可以先看资料、学习新知识。",
-            "偏印": "今早灵感不错。有想法先记下来，稍后整理。",
-            "比肩": "今早适合和别人同步信息，开个短会。",
-            "劫财": "今早注意支出和应酬的邀请。",
-            "食神": "今早心情舒畅，适合做创造性的工作。",
-            "伤官": "今早表达欲强，但注意言辞不要太犀利。",
-            "正财": "今早适合处理财务和预算相关的事务。",
-            "偏财": "今早可能有意外的小惊喜或社交邀请。",
+        # 动态描述 - 结合当日能量
+        is_fav_day = get_five_element_from_stem(day_stem) in self.profile['favorite_elements']
+        
+        if is_fav_day:
+            base = "今天整体能量对你有利，辰时适合趁势推进重要事项。"
+        else:
+            base = "今天整体能量偏弱，辰时适合从简单任务开始，逐步进入状态。"
+        
+        # 时干+日干的组合建议
+        combos = {
+            ("正官","正官"): "今日官星双双出现，规矩感强，适合处理制度性事务，注意不要被条条框框束缚。",
+            ("食神","正官"): "今日食神生正官，表达和规则并存——适合通过沟通解决问题，但注意措辞。",
+            ("伤官","正官"): "今日伤官见官，注意言辞不要过激，特别是和上级沟通时。",
+            ("食神","食神"): "今日双食神，表达欲和创造力双双在线，适合做脑力工作和创意输出。",
+            ("正印","正官"): "今日印星护官，学习效率高，适合早上先看资料再做事。",
         }
+        combo_key = (hour_ten_god, day_ten_god)
+        specific = combos.get(combo_key, f"今日时柱十神为{hour_ten_god}，日柱十神为{day_ten_god}，{'用神' if is_fav_day else '忌神'}日宜{'主动' if is_fav_day else '谨慎'}。")
+        
+        # 时柱纳音
+        from bazi_engine import get_nayin
+        nayin = get_nayin(hour_stem, hour_branch)
         
         return {
             "hour_name": hour_name,
             "hour_time": "07:00-09:00",
-            "description": hour_readings.get("辰", ""),
+            "description": f"辰时(7-9点)时柱为{hour_name}（纳音{nayin}）。{base}",
             "ten_god": hour_ten_god,
-            "ten_god_reading": ten_god_reading.get(hour_ten_god, "保持平常心开始新的一天。"),
+            "ten_god_reading": specific,
             "element": stem_elem,
             "is_favorable": stem_elem in self.profile["favorite_elements"],
         }

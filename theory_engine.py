@@ -159,7 +159,8 @@ class TheoryEngine:
         self.annotations = []  # 积累的个人命理注疏
     
     def analyze_event(self, feedback_date: str, feedback_text: str,
-                      day_stem: int, day_branch: int) -> Dict:
+                      day_stem: int, day_branch: int,
+                      dimension: str = 'all') -> Dict:
         """分析一个反馈事件，连接理论"""
         ten_god = get_ten_god(self.birth['day']['stem'], day_stem)
         stem_elem = get_five_element_from_stem(day_stem)
@@ -173,7 +174,7 @@ class TheoryEngine:
         theories = []
         
         # 十神理论
-        if ten_god in TEN_GOD_THEORY:
+        if ten_god in TEN_GOD_THEORY and dimension in ('all', 'ten_god'):
             t = TEN_GOD_THEORY[ten_god]
             is_fav = get_five_element_from_stem(day_stem) in self.profile['favorite_elements']
             behavior = t['when_favorable'] if is_fav else t['when_unfavorable']
@@ -186,25 +187,27 @@ class TheoryEngine:
             })
         
         # 地支关系理论
-        for rel in relations or ['平']:
-            if rel in BRANCH_RELATION_THEORY:
-                bt = BRANCH_RELATION_THEORY[rel]
-                theories.append({
-                    "type": "地支关系",
-                    "concept": f"{rel}（{EARTHLY_BRANCHES[day_branch]}与日支{EARTHLY_BRANCHES[self.birth['day']['branch']]}）",
-                    "theory": bt['essence'],
-                    "application": bt.get(f'{EARTHLY_BRANCHES[day_branch]}_combine', ''),
-                    "keyword": f"{rel}之力",
-                })
+        if dimension in ('all', 'branch'):
+            for rel in relations or ['平']:
+                if rel in BRANCH_RELATION_THEORY:
+                    bt = BRANCH_RELATION_THEORY[rel]
+                    theories.append({
+                        "type": "地支关系",
+                        "concept": f"{rel}（{EARTHLY_BRANCHES[day_branch]}与日支{EARTHLY_BRANCHES[self.birth['day']['branch']]}）",
+                        "theory": bt['essence'],
+                        "application": bt.get(f'{EARTHLY_BRANCHES[day_branch]}_combine', ''),
+                        "keyword": f"{rel}之力",
+                    })
         
         # 十二长生理论
-        theories.append({
-            "type": "十二长生",
-            "concept": f"辛金在{EARTHLY_BRANCHES[day_branch]}为{stage_name}",
-            "theory": LIFE_STAGE_THEORY.get(stage_name, ''),
-            "application": f"力量系数: {stage_power:.1f}/1.0",
-            "keyword": stage_name,
-        })
+        if dimension in ('all', 'life_stage'):
+            theories.append({
+                "type": "十二长生",
+                "concept": f"辛金在{EARTHLY_BRANCHES[day_branch]}为{stage_name}",
+                "theory": LIFE_STAGE_THEORY.get(stage_name, ''),
+                "application": f"力量系数: {stage_power:.1f}/1.0",
+                "keyword": stage_name,
+            })
         
         # 辛金特质
         theories.append({
