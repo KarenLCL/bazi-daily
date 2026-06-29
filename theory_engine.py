@@ -246,41 +246,109 @@ class TheoryEngine:
     
     def _synthesize(self, feedback: str, ten_god: str, relations: list, 
                     stage: str, theories: list, day_branch: int = -1) -> str:
-        """综合所有理论生成一段连贯的解读"""
+        """从干支参数构建因果分析链——因为A干支关系→所以B能量状态→导致C生活体验"""
         parts = []
+        birth_branch = self.birth['day']['branch']  # 巳=5
         
-        # 理论背景
-        if theories:
-            # 第一个理论奠定基调
-            first = theories[0]
-            if first['type'] == '十神':
-                parts.append(f"今日为{first['concept']}。{first['theory']}")
-                parts.append(first['application'])
+        # ========== 第一步：地支关系决定当日基调 ==========
+        day_branch_name = EARTHLY_BRANCHES[day_branch] if 0 <= day_branch <= 11 else '?'
+        birth_branch_name = EARTHLY_BRANCHES[birth_branch]
         
-        # 反馈现象匹配理论
-        if '言辞' in feedback or '说话' in feedback or '怼' in feedback:
-            if ten_god in ['食神', '伤官']:
-                parts.append(f"你说「{feedback[:30]}…」，这与当日{ten_god}的能量相符——{ten_god}主表达，当日{ten_god}的力量在你的言行中体现了出来。")
+        # 提取各关系的优先解读——按合>冲>刑>害>平的优先级
+        primary_rel = relations[0] if relations else '平'
         
-        if '累' in feedback or '头疼' in feedback or '走不动' in feedback:
-            branch_name = EARTHLY_BRANCHES[day_branch] if day_branch >= 0 else ''
-            stage_note = '帝旺虽为顶峰但物极必反，盛极而衰消耗大' if stage == '帝旺' else f'{stage}日能量本身就偏弱'
-            parts.append(f"你提到身体上的消耗感，这与当日辛金在{branch_name}为{stage}的状态一致——{stage_note}，身体比意识更先感受到这个变化。")
+        # 巳日主的地支关系表
+        SI_RELATIONS = {
+            # (地支序号): (关系, 解读)
+            0: ('子', '合', '子与巳合——子水克巳火，合的本质是水灭火势。你的官星（丙火）受伤，今日在规则和权威面前容易感到无力。'),
+            1: ('丑', '合', '丑与巳相合——丑为湿土，能生金晦火。对你而言，丑合巳等于有人帮你扑灭了多余的火气，印星护身，适合学习吸收。'),
+            2: ('寅', '刑', '寅巳相刑——寅中甲木生巳中丙火，忌神木生忌神火，能量形成恶性循环。刑的实质是：木越多火越旺，火越旺你的压力越大。今日容易遇到让你纠结的小事。'),
+            3: ('卯', '平', '卯为财星，与巳无特殊关系。财生官杀，今日的重点在资源与责任之间的平衡。'),
+            4: ('辰', '合', '辰与巳相合——辰为湿土水库，合巳晦火生金。印库护身，能量被净化，适合整理和归纳。'),
+            5: ('巳', '平', '两巳相见，能量重叠。火势翻倍，官杀力量大增。今日压力加倍，但熟稔的领域反而更从容。'),
+            6: ('午', '会', '午巳半会火局——巳午火力叠加，官杀能量暴增。忌神火势燎原，今日外部压力大，宜静不宜动。'),
+            7: ('未', '平', '未土生金，与巳无特殊刑冲。未为印库，印星得力，适合学习沉淀。'),
+            8: ('申', '合', '巳申合化水——巳中丙火与申中庚金结合，转化为水。合的本质是能量转化：你的官星（火）和帮身（金）都被合走变成了水（食伤）。身弱逢合，等于你的力量被外界借走，所以容易感到被掏空。'),
+            9: ('酉', '合', '巳酉半合金局——金的力量被放大。对身弱的你而言，这是友军到来，能量充值。酉又是你的禄神，今日状态会自然好转。'),
+            10: ('戌', '害', '戌巳相害——戌为火库，燥土脆金。害是暗中消耗，你不会明显感到冲突，但发现事情推进起来比想象的累。'),
+            11: ('亥', '冲', '巳亥相冲——水火交战，巳中丙火被亥中壬水正面冲击。这是力量最强的冲突模式，你的官星受损最严重。今日容易与上级、规则、权威正面碰撞。'),
+        }
         
-        if '学' in feedback or 'AI' in feedback or '知识' in feedback:
-            parts.append(f"你当日在学习和输入方面有收获，这与辛金身弱喜生的特质相关——身弱之人能量不足时，会选择积累和输入而不是输出和扩张，这是一种本能的能量管理策略。")
+        if day_branch in SI_RELATIONS:
+            r_name, r_type, r_desc = SI_RELATIONS[day_branch]
+            if r_type == primary_rel or r_type in (relations or []):
+                parts.append(r_desc)
+            else:
+                parts.append(f"今日地支为{day_branch_name}（{r_name}）。" + r_desc)
+        else:
+            # 十神兜底
+            tg_map = {
+                "正官": "正官为克我之阴阳异。官星主事，今日宜按规则办事，与上级沟通会比较顺畅。",
+                "七杀": "七杀为克我之阴阳同。杀星当头，今日压力偏大，挑战多于机遇。",
+                "正印": "正印为生我之阴阳异。印星护身，今日学习效率高，容易得到帮助。",
+                "偏印": "偏印为生我之阴阳同。偏印主灵感，今日适合创造性工作。",
+                "比肩": "比肩为同我之阴阳同。兄弟星现，今日适合团队协作。",
+                "劫财": "劫财为同我之阴阳异。劫财主社交也主破耗，今日人际活跃但不宜涉及金钱往来。",
+                "食神": "食神为我生之阴阳同。今日心情愉快，适合展现才华。",
+                "伤官": "伤官为我生之阴阳异。今日表达欲强，你的话比平时更有杀伤力，要注意措辞。",
+                "正财": "正财为我克之阴阳异。今日适合处理财务相关事务。",
+                "偏财": "偏财为我克之阴阳同。今日社交机会增多但需保持清醒。",
+            }
+            parts.append(tg_map.get(ten_god, f"今日十神为{ten_god}。"))
         
-        if '开心' in feedback or '好玩' in feedback or '兴奋' in feedback or '收获' in feedback:
-            for t in theories:
-                if t['type'] == '十二长生' and t['concept']:
-                    parts.append(f"你当天的愉悦感并非偶然——辛金在当日地支为{t['concept'].split('为')[1] if '为' in t['concept'] else stage}，{t['theory']}，能量状态支持你有这样的积极体验。")
-                    break
+        # ========== 第二步：十二长生修正能量感知 ==========
+        stage_map = {
+            "长生": "能量在上升期，但初生阶段不稳定，宜养不宜用。",
+            "沐浴": "生机勃勃但不稳定，适合试验和探索。",
+            "冠带": "渐成气候，适合开始新计划。",
+            "临官": "身弱得禄为正，今日能量恰好够用，适合主动推进。",
+            "帝旺": "力量达到顶峰但物极必反，身弱逢帝旺如回光返照——虽有力但不可持续，宜收不宜放。",
+            "衰": "力量开始衰退，适合收尾和复盘。",
+            "病": "精气神不足，不适合做重大决定。",
+            "死": "能量低位运行，旧的不去新的不来。",
+            "墓": "能量收藏沉淀，适合整理和内省。",
+            "绝": "力量断绝，但绝处有新机，宜静待时机。",
+            "胎": "新力量在酝酿中，宜规划不宜行动。",
+            "养": "蓄势待发，宜准备不宜执行。",
+        }
+        if stage in stage_map:
+            parts.append(f"能量层面：辛金在{day_branch_name}为{stage}——{stage_map[stage]}")
         
-        # 如果没有匹配到关键词，给出通用理论解读
-        if len(parts) <= 1:
-            parts.append(f"当天的八字参数（{ten_god}、{', '.join(relations) if relations else '平稳'}、{stage}）共同构成了你的当日能量场，你当天的经历就是这个能量场在你生活中的投射。")
+        # ========== 第三步：分析反馈中的因果印证 ==========
+        if feedback and len(feedback) > 5:
+            # 看看反馈是否符合干支预设的推论
+            has_exhaustion = any(w in feedback for w in ['累','疼','困','疲惫','不想动'])
+            has_conflict = any(w in feedback for w in ['怼','怒','气','吵','争','激烈'])
+            has_creativity = any(w in feedback for w in ['做','写','设计','完成','做成了'])
+            has_learning = any(w in feedback for w in ['学','听','读','看','了解','整理'])
+            has_social = any(w in feedback for w in ['朋友','同事','一起','陪','聊','饭'])
+            
+            confirmations = []
+            
+            # 合日的消耗
+            if primary_rel in ('合', '三合') and has_exhaustion:
+                confirmations.append(f"地支逢合，能量被牵动——正是因为合的关系，你的精力才会被外界因素借走。这不是偶然，而是八字参数决定的气场流动。")
+            
+            # 冲日的冲突
+            if primary_rel == '冲' and has_conflict:
+                confirmations.append(f"地支逢冲，冲突的能量今日确实应验在了你的生活中——巳亥冲在现实中就是以人际关系冲突的方式体现的。")
+            
+            # 印星日的学习
+            if ten_god in ('正印', '偏印') and has_learning:
+                confirmations.append(f"印星日选择学习，这是八字能量在引导你——身弱喜印，今日的星象暗示了『输入优于输出』的行动策略。")
+            
+            # 食伤日的表达
+            if ten_god in ('食神', '伤官') and (has_creativity or has_conflict):
+                confirmations.append(f"食伤为表达星，今日你在表达和创造方面确实活跃。食伤泄身，你感到的消耗是正常的——身弱者逢食伤日，输出的能量都来自于本气的透支。")
+            
+            # 忌神日被动安静
+            if ten_god in ('正官', '七杀') and has_learning and not has_conflict:
+                confirmations.append(f"官杀日外部压力大，你选择把能量用在学习和内在积累上——这不是巧合，而是身弱之人在官杀日的本能反应：能量不够和外界的硬性要求对抗时，退而充电是最优解。")
+            
+            if confirmations:
+                parts.append('——印证：' + ' '.join(confirmations))
         
-        return ' '.join(parts)
+        return '\n'.join(parts)
     
     def analyze_recent_feedback(self, days: int = 30) -> List[Dict]:
         """分析最近的反馈，积累注疏"""

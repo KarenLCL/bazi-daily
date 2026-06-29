@@ -496,50 +496,127 @@ class PersonalizedInterpreter:
         return reminders
     
     def _generate_hour_reading(self, daily_bazi) -> Dict:
-        """生成辰时(8:00)特别解读 - 根据当天五行动态调整"""
+        """分析今日十二时辰，找出最佳/需谨慎的时段——不再是固定说辰时最好"""
         hour_stem = daily_bazi["hour"]["stem"]
         hour_branch = daily_bazi["hour"]["branch"]
         day_stem = daily_bazi["day"]["stem"]
         day_branch = daily_bazi["day"]["branch"]
+        birth_day_stem = self.birth_chart["day"]["stem"]
+        birth_day_branch = self.birth_chart["day"]["branch"]
         
         hour_name = daily_bazi["hour"]["name"]
         stem_elem = get_five_element_from_stem(hour_stem)
-        
-        birth_day_stem = self.birth_chart["day"]["stem"]
         hour_ten_god = get_ten_god(birth_day_stem, hour_stem)
         day_ten_god = get_ten_god(birth_day_stem, day_stem)
         
-        # 动态描述 - 结合当日能量
-        is_fav_day = get_five_element_from_stem(day_stem) in self.profile['favorite_elements']
+        from bazi_engine import get_hour_stem_branch, get_nayin
         
-        if is_fav_day:
-            base = "今天整体能量对你有利，辰时适合趁势推进重要事项。"
+        # ---- 分析今日所有时辰的优劣 ----
+        hour_scores = []
+        for hh in range(0, 24, 2):
+            hs, hb = get_hour_stem_branch(day_stem, hh)
+            h_tg = get_ten_god(birth_day_stem, hs)
+            h_elem = get_five_element_from_stem(hs)
+            h_relations = get_branch_relation(hb, birth_day_branch)
+            is_fav = h_elem in self.profile['favorite_elements']
+            
+            # 综合评分
+            h_score = 50
+            if is_fav:
+                h_score += 20
+            if '合' in h_relations:
+                h_score += 10
+            if '三合' in h_relations:
+                h_score += 15
+            if '冲' in h_relations:
+                h_score -= 20
+            if '刑' in h_relations:
+                h_score -= 10
+            if '害' in h_relations:
+                h_score -= 5
+            
+            hour_scores.append({
+                'h': hh,
+                'period': f'{hh:02d}:00-{hh+1:02d}:59',
+                'stem': hs,
+                'branch': hb,
+                'ten_god': h_tg,
+                'score': h_score,
+                'is_fav': is_fav,
+            })
+        
+        # 排序找出最佳和最差的时段
+        sorted_hours = sorted(hour_scores, key=lambda x: x['score'], reverse=True)
+        best_hours = sorted_hours[:3]
+        worst_hours = [h for h in sorted_hours[-3:] if h['score'] < 50]
+        
+        # 辰时的具体分析
+        chen_score = next((h for h in hour_scores if h['branch'] == 4), None)
+        
+        period_names = {0:'子时',2:'丑时',4:'寅时',6:'卯时',8:'辰时',10:'巳时',
+                       12:'午时',14:'未时',16:'申时',18:'酉时',20:'戌时',22:'亥时'}
+        
+        # 辰时好不好？
+        if chen_score:
+            chen_is_good = chen_score['score'] >= 60
+            if chen_is_good:
+                chen_verdict = f"辰时今日评分{chen_score['score']}分，对你而言是有利的时段。时柱{chen_score['ten_god']}，能量顺畅。"
+            else:
+                chen_verdict = f"辰时今日评分{chen_score['score']}分，并不算最佳选择。时柱为{chen_score['ten_god']}，{'用神' if chen_score['is_fav'] else '忌神'}，能量一般。"
         else:
-            base = "今天整体能量偏弱，辰时适合从简单任务开始，逐步进入状态。"
+            chen_verdict = ""
+        
+        # 最佳时段描述
+        best_desc = ""
+        if best_hours:
+            best_periods = [f"{period_names.get(h['h'],'')}({h['period']})" for h in best_hours]
+            best_desc = f"今日最佳时段：{'、'.join(best_periods[:2])}。"
+        
+        # 需谨慎时段
+        worst_desc = ""
+        if worst_hours:
+            worst_periods = [f"{period_names.get(h['h'],'')}({h['period']})" for h in worst_hours]
+            worst_desc = f"需谨慎时段：{'、'.join(worst_periods[:2])}。"
+        
+        # 综合建议
+        if best_hours and best_hours[0]['h'] == 8:
+            time_advice = "今天辰时刚好是精力最好的时段，自然醒就对了。"
+        elif best_hours and best_hours[0]['h'] <= 6:
+            time_advice = f"今天精力集中在上午前半段(6点前)，辰时已不是最佳窗口，建议做收尾性工作。"
+        elif best_hours and best_hours[0]['h'] >= 12:
+            time_advice = f"今天上午需要暖机，真正的精力高峰在{period_names.get(best_hours[0]['h'],'')}之后。辰时适合先做热身性质的事。"
+        elif best_hours and best_hours[0]['h'] >= 16:
+            time_advice = f"今天状态晚上比白天好——{period_names.get(best_hours[0]['h'],'')}才到巅峰，辰时不用逼自己太早进入状态。"
+        else:
+            time_advice = f"{best_desc}{worst_desc}"
         
         # 时干+日干的组合建议
-        combos = {
-            ("正官","正官"): "今日官星双双出现，规矩感强，适合处理制度性事务，注意不要被条条框框束缚。",
-            ("食神","正官"): "今日食神生正官，表达和规则并存——适合通过沟通解决问题，但注意措辞。",
-            ("伤官","正官"): "今日伤官见官，注意言辞不要过激，特别是和上级沟通时。",
-            ("食神","食神"): "今日双食神，表达欲和创造力双双在线，适合做脑力工作和创意输出。",
-            ("正印","正官"): "今日印星护官，学习效率高，适合早上先看资料再做事。",
-        }
         combo_key = (hour_ten_god, day_ten_god)
-        specific = combos.get(combo_key, f"今日时柱十神为{hour_ten_god}，日柱十神为{day_ten_god}，{'用神' if is_fav_day else '忌神'}日宜{'主动' if is_fav_day else '谨慎'}。")
+        combos = {
+            ("正官","正官"): "今日官星双双出现，规矩感强，适合处理制度性事务。",
+            ("食神","正官"): "食神生正官，适合通过沟通解决问题，注意措辞。",
+            ("伤官","正官"): "伤官见官，注意言辞不要过激，特别是和上级沟通时。",
+            ("食神","食神"): "双食神，表达欲和创造力双双在线，适合做创意工作。",
+            ("正印","正官"): "印星护官，学习效率高，适合早上先看资料再做事。",
+            ("正印","食神"): "印星生食神，知识和表达的结合——今天学到的东西很适合分享出去。",
+            ("偏印","伤官"): "偏印配伤官，思维深度和表达锋芒并存，是好的创作组合。",
+        }
+        specific = combos.get(combo_key, f"今日时柱{hour_ten_god}配日柱{day_ten_god}，{'用神日宜主动' if get_five_element_from_stem(day_stem) in self.profile['favorite_elements'] else '忌神日宜谨慎'}。")
         
-        # 时柱纳音
         from bazi_engine import get_nayin
-        nayin = get_nayin(hour_stem, hour_branch)
+        chen_nayin = get_nayin(hour_stem, hour_branch)
         
         return {
             "hour_name": hour_name,
             "hour_time": "07:00-09:00",
-            "description": f"辰时(7-9点)时柱为{hour_name}（纳音{nayin}）。{base}",
+            "description": f"辰时(7-9点)时柱为{hour_name}（纳音{chen_nayin}）。{chen_verdict}",
             "ten_god": hour_ten_god,
             "ten_god_reading": specific,
             "element": stem_elem,
             "is_favorable": stem_elem in self.profile["favorite_elements"],
+            "best_hours": [{'period': h['period'], 'name': period_names.get(h['h'],''), 'ten_god': h['ten_god'], 'score': h['score']} for h in best_hours[:2]],
+            "worst_hours": [{'period': h['period'], 'name': period_names.get(h['h'],''), 'ten_god': h['ten_god'], 'score': h['score']} for h in worst_hours[:2]],
+            "time_advice": time_advice,
         }
     
     def generate_monthly_reading(self, year: int, month: int) -> Dict:

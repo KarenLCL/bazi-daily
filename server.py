@@ -745,10 +745,23 @@ class BaziHandler(BaseHTTPRequestHandler):
         content += '</div>'
         
         content += f'''
-        <div class="card"><div class="card-header"><span class="card-icon">🌅</span><span class="card-title">辰时 (7-9点)</span></div>
+        <div class="card"><div class="card-header"><span class="card-icon">🌅</span><span class="card-title">时辰宜忌</span></div>
         <p class="card-text">{hr["description"]}</p>
-        <p class="card-text card-sub">{hr["ten_god_reading"]}</p></div>
+        <p class="card-text card-sub">{hr["ten_god_reading"]}</p>
+        <p class="card-text" style="margin-top:8px;padding:10px;background:#fff;border-radius:8px">⏰ {hr["time_advice"]}</p>'''
         
+        if hr.get('best_hours'):
+            content += '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">'
+            for h in hr['best_hours']:
+                content += f'<span class="tag tag-good">✅ {h["name"]}({h["ten_god"]})</span>'
+            if hr.get('worst_hours'):
+                for h in hr['worst_hours']:
+                    content += f'<span class="tag tag-bad">⚠️ {h["name"]}({h["ten_god"]})</span>'
+            content += '</div>'
+        
+        content += '</div>'
+        
+        content += f'''
         <div class="card card-feedback">
         <div class="card-header"><span class="card-icon">📝</span><span class="card-title">记录今日之象</span></div>'''
         
